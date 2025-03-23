@@ -1,6 +1,6 @@
-#ifndef MSG_CONFIRM
-#define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
-#endif
+// #ifndef MSG_CONFIRM
+// #define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
+// #endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +8,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <csignal>
 #include "satellite.h"
 
 #define MAX_FRAGMENTS 100
@@ -61,7 +62,7 @@ void* receive_data(void *arg){
         
         int fragment_id;
         memcpy(&fragment_id, buffer, sizeof(int));  // 解析分片编号
-        char *data = buffer + sizeof(int);  // 解析分片数据
+        //char *data = buffer + sizeof(int);  // 解析分片数据
 
         printf("Received fragment %d from base station\n", fragment_id);
         

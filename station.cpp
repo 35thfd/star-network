@@ -1,9 +1,10 @@
-#ifndef MSG_CONFIRM
-#define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
-#endif
+// #ifndef MSG_CONFIRM
+// #define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
+// #endif
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -24,7 +25,7 @@ void* Station::process_message(void *arg) {
     struct sockaddr_in satellite_addr = data->satellite_addr;
     Station *base_station = data->base_station;
 
-    if (base_station->task_queue.size() < base_station->cnt) {
+    if (base_station->task_queue.size() < static_cast<size_t>(base_station->cnt)) {
         base_station->init_queue();
     }
 
