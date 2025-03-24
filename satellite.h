@@ -11,6 +11,7 @@ typedef enum {
 
 // 定义卫星结构体
 
+
 typedef struct {
     SatelliteType type;  
     int id;              
@@ -34,6 +35,23 @@ class Sate {
 
 
     //void save_fragment(fragment_id, data);
+    void initialize() {
+
+        memset(missing_blocks, 0, sizeof(missing_blocks));
+        for(int i = 1 ; i <= 10; i++)
+        {
+            missing_blocks[i] = i;
+        }
+        //此处先定义为10,后续改为-1，发送时如果发现是-1代表还没有接收到数据包数量信息，需要等待
+        missing_count = 10;
+        
+        for (int i = 0; i < 1024; i++) {
+            frequency[i] = 0; 
+        }
+        
+        memset(data, 0, sizeof(data));
+    }
+
     
 };
 

@@ -38,13 +38,19 @@ int main() {
             perror("recvfrom failed");
             continue;
         }
-        buffer[n] = '\0';
+        //buffer[n] = '\0';
         printf("Base Station: Received Control Message from Satellite: %s\n", buffer);
-
+        
         //创建传输进程
         pthread_t process_thread;
         ProcessData *data = (ProcessData *)malloc(sizeof(ProcessData));
-        data->control_message = strdup(buffer);
+        data->control_message = (char*)malloc(n);  // 为接收的数据分配内存
+        if (data->control_message == NULL) {
+            perror("Memory allocation failed");
+            continue;  // 如果内存分配失败，跳过此次处理
+        }
+
+        memcpy(data->control_message, buffer, n);  
         data->socket_fd = socket_fd;
         data->satellite_addr = satellite_addr;
         data->base_station = &base_station;

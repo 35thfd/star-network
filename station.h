@@ -10,8 +10,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define CNT 100   // 默认队列长度
+#define CNT 100   //数据片数量
 #define PORT 8080 // 服务器监听端口
+#define DATA_SIZE 1024
 
 // 报文格式
 typedef struct {
@@ -26,7 +27,7 @@ typedef struct {
 // 基站类
 class Station {
 public:
-    char packet[100][10000];
+    char packet[100][DATA_SIZE];
     std::queue<int> task_queue; // 改名，避免与 std::queue 冲突
     int cnt;               
     pthread_t monitor_thread;
@@ -48,7 +49,7 @@ public:
         
         // 设置服务器地址
         server_addr->sin_family = AF_INET;
-        server_addr->sin_addr.s_addr = INADDR_ANY; 
+        server_addr->sin_addr.s_addr = inet_addr("127.0.0.1"); 
         server_addr->sin_port = htons(PORT);
     
         // 绑定Socket到指定端口
@@ -116,7 +117,7 @@ public:
 
         return send_data;
     }
-    
+
     static void* process_message(void* arg);
 };
 
