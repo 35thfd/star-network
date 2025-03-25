@@ -63,6 +63,7 @@ int main() {
         }
 
         pthread_detach(process_thread);
+        sleep(1);
     }
 
     close(socket_fd);

@@ -18,8 +18,10 @@ using namespace std;
 #define FRAGMENT_SIZE 512
 #define BUFFER_SIZE (sizeof(int) + FRAGMENT_SIZE)
 #define BASE_STATION_IP "127.0.0.1" 
+#define Neighbour_IP "127.0.0.1" 
 #define BASE_STATION_PORT 8080
 #define SATELLITE_PORT 9999 
+#define Nei_PORT 10010
 
 volatile int exit_flag = 0;
 
@@ -33,11 +35,11 @@ void send_control_info(int sockfd, struct sockaddr_in *des_addr, int *missing_bl
     memcpy(buffer + sizeof(int), &missing_count, sizeof(int)); 
     memcpy(buffer + sizeof(int) * 2, (missing_blocks+1), missing_count * sizeof(int));
     cout << "Control info sent: ";
-    for (int i = 0; i < sizeof(int)*2 + missing_count * sizeof(int); i++) {
+    for (int i = 0; i < sizeof(int) * 2 + missing_count * sizeof(int); i++) {
         printf("%02x ", (unsigned char)buffer[i]);
     }
     printf("\n");
-    sendto(sockfd, buffer, sizeof(int) + missing_count * sizeof(int), MSG_CONFIRM, 
+    sendto(sockfd, buffer, sizeof(int) * 2 + missing_count * sizeof(int), MSG_CONFIRM, 
            (const struct sockaddr *)des_addr, sizeof(*des_addr));
 
     printf("Sent control info: %d fragments\n", missing_count);
@@ -55,6 +57,24 @@ void send_to_base_station(int sockfd, int* missing_blocks, int missing_count){
     }
 
     send_control_info(sockfd, &base_station_addr, missing_blocks, missing_count);
+}
+
+void send_to_neighbor_satellite(int sockfd, int* missing_blocks, int missing_count, int neighborcount, Satellite neighbors[]){
+    struct sockaddr_in neighbor_satellite_addr;
+    for(int i = 0; i < neighborcount; i ++)
+    {
+        neighbors[i];
+        memset(&neighbor_satellite_addr, 0, sizeof(neighbor_satellite_addr));
+        neighbor_satellite_addr.sin_family = AF_INET;
+        //todo 修改端口号和ip地址
+        neighbor_satellite_addr.sin_port = htons(Nei_PORT);
+        if (inet_pton(AF_INET, Neighbour_IP, &neighbor_satellite_addr.sin_addr) <= 0) {
+            perror("Invalid neighbor_satellite_addr address");
+            exit(EXIT_FAILURE);
+        }
+
+        send_control_info(sockfd, &neighbor_satellite_addr, missing_blocks, missing_count);
+    }
 }
 
 //TODO:更改报文结构，维护第一位为报文区分
@@ -77,24 +97,20 @@ void* receive_data(void *arg){
         //将control_buffer中的信息代码读出来
         int kind;
         memcpy(&kind, control_buffer, sizeof(int)); 
-        printf("%d ", kind);
-        int fragment_id;
-        memcpy(&fragment_id, control_buffer + sizeof(int), sizeof(int));  // 解析分片编号
-        printf("%d\n", fragment_id);
+        printf("data kind : %d\n ", kind);
+        //int fragment_id;
+        //memcpy(&fragment_id, control_buffer + sizeof(int), sizeof(int));  // 解析分片编号
+        //printf("%d\n", fragment_id);
         char *buffer = NULL;
         buffer = control_buffer + sizeof(int);
-        for (int i = 0; i < 50; i++) {
-            printf("%02x ", (unsigned char)control_buffer[i]);
-        }
         switch (kind)
         {
         //case 0 接收到的是数据包信息
         //发送的数据格式：[4字节 分片编号] + [实际分片数据]
         case 0:
             {
-                //int fragment_id;
-                //memcpy(&fragment_id, control_buffer + sizeof(int), sizeof(int));  // 解析分片编号
-                //printf("%d\n", fragment_id);
+                int fragment_id;
+                memcpy(&fragment_id, control_buffer + sizeof(int), sizeof(int));  // 解析分片编号
                 char *data = buffer + sizeof(int);  // 解析分片数据
                 printf("Received fragment %d from base station\n", fragment_id);
                 
@@ -112,16 +128,26 @@ void* receive_data(void *arg){
                         //使用卫星见使用发送进程定期维护彼此数据保持有信息之后，在数据包信息发生变化后才发送请求信息
                         //数据包信息改变后立刻与所有连接的基站或其他卫星进行update
                         send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
-                        //send_to_satellite();
+                        //send_to_neighbor_satellite(satellite->sockfd, satellite->missing_blocks, satellite->missing_count, satellite->neighbor_count, satellite->neighbors);
                         break;
                     }
                 }
             }
             break;
         //case 1 接收到的是其他卫星的数据流信息
+        //默认能发过来控制流信息的卫星都是自己的邻居，已经建立连接的邻居
         case 1:
             {
-                
+                // if()
+                // {
+                //     int blocknum;
+                //     memcpy(&blocknum, buffer, sizeof(int));  // 解析分片编号
+                //     satellite->missing_count = blocknum;
+                //     for(int i = 1; i <= blocknum; i ++)
+                //     {
+                //         satellite->missing_blocks[i] = i;
+                //     }
+                // }
             }
             break;
 
@@ -137,7 +163,13 @@ void* receive_data(void *arg){
                 }
                 break;
             }
-            
+        // 卫星应该有自己维护星间路由的算法，这个应该已经由502所实现好了，所以这部分信息单独拿出一个控制序号仅用来模拟卫星间的连接，维护邻居信息
+        // 也可以和数据请求信息结合
+        // 报文只有控制序号，没有其他信息，需要记录recvfrom获得的addr
+        case 3:
+            {
+                
+            }
         }
         
     }
@@ -149,6 +181,7 @@ void* send_data(void *arg){
     while(1){
         if(satellite->missing_count != -1){
             send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
+            //发送连接请求
         }
         sleep(SLEEP_TIME);
     }
@@ -194,19 +227,29 @@ int main(){
     }
     pthread_detach(receive_thread);
 
+
     //进行与基站的第一次互通
     //把发送代码放入线程
     //使用每隔一段时间就发送一次数据的方式发送请求信息
     //初步使用有来自发送处的返回数据包信息就意味着是卫星的一个neighbor
     //后续可以优化为星间路由代码
     pthread_t send_thread;
-    if (pthread_create(&receive_thread, NULL, send_data, (void*)satellite) != 0) {
+    if (pthread_create(&send_thread, NULL, send_data, (void*)satellite) != 0) {
         perror("Failed to create send thread");
         exit(EXIT_FAILURE);
     }
     pthread_detach(send_thread);
     //send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
     
+    //发送心跳报文，维护邻居信息
+    pthread_t heartbeat_thread;
+    // if (pthread_create(&heartbeat_thread, NULL, send_data, (void*)satellite) != 0) {
+    //     perror("Failed to create send thread");
+    //     exit(EXIT_FAILURE);
+    // }
+    // pthread_detach(heartbeat_thread);
+
+
     signal(SIGINT, signal_handler);
     while (!exit_flag) {
         sleep(1);

@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define CNT 100   //数据片数量
+#define CNT 10   //数据片数量
 #define PORT 8080 // 服务器监听端口
 #define DATA_SIZE 1024
 
@@ -91,7 +91,6 @@ public:
     int check(int* s, int s_size) {
         std::queue<int> temp_queue;
         int send_data = -1;
-
         while (!task_queue.empty()) {
             int block_id = task_queue.front();
             task_queue.pop();
@@ -114,7 +113,14 @@ public:
             task_queue.push(temp_queue.front());
             temp_queue.pop();
         }
-
+        
+        // std::queue<int> print_queue = task_queue; // Make a copy of the queue
+        // while (!print_queue.empty()) {
+        //     printf("%d ", print_queue.front());
+        //     print_queue.pop();
+        // }
+        // printf("\n");
+        
         return send_data;
     }
 

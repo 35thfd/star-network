@@ -23,9 +23,6 @@ void* Station::process_message(void *arg) {
     int socket_fd = data->socket_fd;
     struct sockaddr_in satellite_addr = data->satellite_addr;
     Station *base_station = data->base_station;
-    // for (int i = 0; i < sizeof(int) + 10 * sizeof(int); i++) {
-    //     printf("%02x ", (unsigned char)control_message[i]);
-    // }
 
     if (base_station->task_queue.size() < 2 * base_station->cnt) {
         base_station->init_queue();
@@ -42,7 +39,7 @@ void* Station::process_message(void *arg) {
         int fragment_id = base_station->check(missing_fragments, cnt);
         printf("choose fragment %d to send\n", fragment_id);
         if (fragment_id != -1) {
-            size_t data_size = DATA_SIZE;  // 修正：packet 是 char 数组，直接使用 DATA_SIZE
+            size_t data_size = DATA_SIZE;
             char buffer[sizeof(int) * 2 + data_size];
     
             int control_flag = 0;  // 控制报文

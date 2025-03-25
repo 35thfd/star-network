@@ -10,15 +10,6 @@
 #define CNT 100  // 最大数据块数量
 #define MAX_SATELLITES 10  // 最大卫星数量
 
-typedef struct {
-    SatelliteType type;  // 卫星类型
-    Satellite* neighbors[20];
-    int id;              // 卫星编号
-    int missing_blocks[1024];  // 缺失的数据分片列表
-    int missing_count;  // 缺失的数据分片数量
-    int frequency[1024]; 
-} Satellite;
-
 
 typedef struct {
     uint16_t satellite_id;  
