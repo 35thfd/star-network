@@ -1,6 +1,6 @@
-// #ifndef MSG_CONFIRM
-// #define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
-// #endif
+#ifndef MSG_CONFIRM
+#define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
