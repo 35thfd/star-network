@@ -1,12 +1,13 @@
-#ifndef MSG_CONFIRM
-#define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
-#endif
+// #ifndef MSG_CONFIRM
+// #define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
+// #endif
 
 #include <stdio.h>
 #include <iostream>
 #include <stdlib.h>
 #include <pthread.h>
 #include <string.h>
+#include <csignal>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include "satellite.h"
@@ -35,7 +36,7 @@ void send_control_info(int sockfd, struct sockaddr_in *des_addr, int *missing_bl
     memcpy(buffer + sizeof(int), &missing_count, sizeof(int)); 
     memcpy(buffer + sizeof(int) * 2, (missing_blocks+1), missing_count * sizeof(int));
     cout << "Control info sent: ";
-    for (int i = 0; i < sizeof(int) * 2 + missing_count * sizeof(int); i++) {
+    for (size_t i = 0; i < sizeof(int) * 2 + missing_count * sizeof(int); i++) {
         printf("%02x ", (unsigned char)buffer[i]);
     }
     printf("\n");
@@ -194,6 +195,12 @@ void signal_handler(int signum) {
 }
 
 int main(){
+    //printf("hi\n");
+    while(1){
+        printf("running\n");
+        fflush(stdout); 
+        sleep(1);
+    }
     struct sockaddr_in satellite_addr;
     Sate *satellite = (Sate*) malloc(sizeof(Sate));  // ✅ 确保 satellite 被分配内存
 
@@ -251,7 +258,8 @@ int main(){
 
 
     signal(SIGINT, signal_handler);
-    while (!exit_flag) {
+    while (1) {
+        printf("hello\n");
         sleep(1);
     }
     printf("Satellite shutting down...\n");

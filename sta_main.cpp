@@ -17,6 +17,7 @@
 char recv_packet[MAX_PACKET_SIZE];
 
 int main() {
+    //printf("hello\n");
     int socket_fd;
     struct sockaddr_in base_station_addr;
     Station base_station;  
