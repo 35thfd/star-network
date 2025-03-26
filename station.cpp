@@ -37,7 +37,7 @@ void* Station::process_message(void *arg) {
     if(kind == 1)
     {
         int fragment_id = base_station->check(missing_fragments, cnt);
-        printf("choose fragment %d to send\n", fragment_id);
+        printf("choose fragment %d send to satellite address: %s:%d\n",  fragment_id, inet_ntoa(satellite_addr.sin_addr), ntohs(satellite_addr.sin_port));
         if (fragment_id != -1) {
             size_t data_size = DATA_SIZE;
             char buffer[sizeof(int) * 2 + data_size];

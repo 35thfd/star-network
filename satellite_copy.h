@@ -18,7 +18,7 @@ typedef enum {
 typedef struct {
     SatelliteType type;  
     int id;
-    char neighborip[INET_ADDRSTRLEN];  // 存储邻居 IP
+    char neighborip[16];  // 存储邻居 IP
     int neighbor_ports;  // 存储邻居端口
     int missing_blocks[1024]; 
     int missing_count; 
@@ -59,7 +59,7 @@ class Sate {
         }
         
         strncpy(neighbors[0].neighborip, "127.0.0.1", INET_ADDRSTRLEN);  
-        neighbors[0].neighbor_ports = 10010;  // 假设第一个邻居监听 5001 端口
+        neighbors[0].neighbor_ports = 9999;  // 假设第一个邻居监听 5001 端口
 
         memset(data, 0, sizeof(data));
     }

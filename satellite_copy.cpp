@@ -151,8 +151,11 @@ void* receive_data(void *arg){
                         memcpy(satellite->data[fragment_id], data, 1024); 
                         //使用卫星见使用发送进程定期维护彼此数据保持有信息之后，在数据包信息发生变化后才发送请求信息
                         //数据包信息改变后立刻与所有连接的基站或其他卫星进行update
+                        if(satellite->missing_count != 0)
+                        {
                         send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
                         //send_to_neighbor_satellite(satellite->sockfd, satellite->missing_blocks, satellite->missing_count, satellite->neighbor_count, satellite->neighbors);
+                        }
                         break;
                     }
                 }
@@ -278,7 +281,7 @@ void* send_heartbeat(void *arg){
     // 配置广播地址
     memset(&broadcast_addr, 0, sizeof(broadcast_addr));
     broadcast_addr.sin_family = AF_INET;
-    broadcast_addr.sin_port = htons(SATELLITE_PORT); // 目标端口
+    broadcast_addr.sin_port = htons(SATELLITE_PORT); // 目标端口,所有卫星都在同一端口，后续迁移到docker上使用，目前用不了
     
     //broadcast_addr.sin_addr.s_addr = inet_addr("255.255.255.255"); // 在统一子网内广播的广播
     
@@ -336,7 +339,7 @@ int main(){
     memset(&satellite_addr, 0, sizeof(satellite_addr));
     satellite_addr.sin_family = AF_INET;
     satellite_addr.sin_addr.s_addr = INADDR_ANY;
-    satellite_addr.sin_port = htons(SATELLITE_PORT);
+    satellite_addr.sin_port = htons(Nei_PORT);
 
     if (bind(satellite->sockfd, (const struct sockaddr *)&satellite_addr, sizeof(satellite_addr)) < 0) {
         perror("Bind failed");

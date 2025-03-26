@@ -26,6 +26,8 @@ int main() {
         return EXIT_FAILURE;
     }
     base_station.sockfd = socket_fd;
+    
+    memset(base_station.packet, 1, sizeof(base_station.packet));
 
     char buffer[1024];
     struct sockaddr_in satellite_addr;
