@@ -151,8 +151,16 @@ void* receive_data(void *arg){
                         memcpy(satellite->data[fragment_id], data, 1024); 
                         //使用卫星见使用发送进程定期维护彼此数据保持有信息之后，在数据包信息发生变化后才发送请求信息
                         //数据包信息改变后立刻与所有连接的基站或其他卫星进行update
-                        send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
-                        //send_to_neighbor_satellite(satellite->sockfd, satellite->missing_blocks, satellite->missing_count, satellite->neighbor_count, satellite->neighbors);
+                        if(source_addr.sin_port == htons(BASE_STATION_PORT))
+                        {
+                            send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
+                            //向基站发送请求
+                        }
+                        else
+                        {
+                            //向邻居卫星发送请求
+                            send_control_info(satellite->sockfd, &source_addr, satellite->missing_blocks, satellite->missing_count);
+                        }
                         break;
                     }
                 }
@@ -209,7 +217,7 @@ void* receive_data(void *arg){
                 satellite->missing_count = blocknum;
                 for(int i = 1; i <= blocknum; i ++)
                 {
-                    satellite->missing_blocks[i] = i;
+                    satellite->missing_blocks[i] = i;//初始化
                 }
             }
             break;
@@ -245,6 +253,9 @@ void* receive_data(void *arg){
                     } else {
                         printf("Neighbor list full, cannot add new neighbor.\n");
                     }
+                    //开始发送第一次请求
+                    send_control_info(satellite->sockfd, &source_addr, satellite->missing_blocks, satellite->missing_count);
+                    //send_to_neighbor_satellite(satellite->sockfd, satellite->missing_blocks, satellite->missing_count, satellite->neighbor_count, satellite->neighbors);
                 }
             }
             break;
@@ -262,7 +273,7 @@ void* send_data(void *arg){
             //能不能检测
             //发送连接请求
             //向其他已经连接的卫星发送请求
-            send_to_neighbor_satellite(satellite->sockfd, satellite->missing_blocks, satellite->missing_count, satellite->neighbor_count, satellite->neighbors);
+            //send_to_neighbor_satellite(satellite->sockfd, satellite->missing_blocks, satellite->missing_count, satellite->neighbor_count, satellite->neighbors);
         }
         sleep(SLEEP_TIME);
     }
@@ -365,12 +376,12 @@ int main(){
     pthread_detach(send_thread);
     
     //发送心跳报文，维护邻居信息
-    // pthread_t heartbeat_thread;
-    // if (pthread_create(&heartbeat_thread, NULL, send_data, (void*)satellite) != 0) {
-    //     perror("Failed to create send thread");
-    //     exit(EXIT_FAILURE);
-    // }
-    // pthread_detach(heartbeat_thread);
+    pthread_t heartbeat_thread;
+    if (pthread_create(&heartbeat_thread, NULL, send_data, (void*)satellite) != 0) {
+        perror("Failed to create send thread");
+        exit(EXIT_FAILURE);
+    }
+    pthread_detach(heartbeat_thread);
 
 
     signal(SIGINT, signal_handler);
