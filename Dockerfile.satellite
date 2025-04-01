@@ -1,0 +1,5 @@
+FROM ubuntu:latest
+WORKDIR /app
+COPY ./satellite /app/satellite
+RUN chmod +x /app/satellite
+CMD ["/app/satellite"]

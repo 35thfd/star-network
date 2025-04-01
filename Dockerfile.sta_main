@@ -1,0 +1,5 @@
+FROM ubuntu:latest
+WORKDIR /app
+COPY station /app/station
+RUN chmod +x station
+CMD ["./station"]

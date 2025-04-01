@@ -19,11 +19,11 @@ using namespace std;
 #define SLEEP_TIME 10
 #define FRAGMENT_SIZE 512
 #define BUFFER_SIZE (sizeof(int) + FRAGMENT_SIZE)
-#define BASE_STATION_IP "127.0.0.1" 
-#define Neighbour_IP "127.0.0.1" 
+#define BASE_STATION_IP "192.168.1.100" 
+//#define Neighbour_IP "127.0.0.1" 
 #define BASE_STATION_PORT 8080
-#define SATELLITE_PORT 9999 
-#define Nei_PORT 10010
+#define SATELLITE_PORT 8080 
+#define Nei_PORT 8080
 
 volatile int exit_flag = 0;
 

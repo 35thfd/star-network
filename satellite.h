@@ -58,8 +58,8 @@ class Sate {
             frequency[i] = 1; 
         }
         
-        strncpy(neighbors[0].neighborip, "127.0.0.1", INET_ADDRSTRLEN);  
-        neighbors[0].neighbor_ports = 10010;  // 假设第一个邻居监听 5001 端口
+        //strncpy(neighbors[0].neighborip, "127.0.0.1", INET_ADDRSTRLEN);  
+        //neighbors[0].neighbor_ports = 10010;  // 假设第一个邻居监听 5001 端口
 
         memset(data, 0, sizeof(data));
     }
