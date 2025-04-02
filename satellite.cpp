@@ -1,6 +1,6 @@
-#ifndef MSG_CONFIRM
-#define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
-#endif
+// #ifndef MSG_CONFIRM
+// #define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
+// #endif
 
 #include <stdio.h>
 #include <iostream>
@@ -18,8 +18,10 @@ using namespace std;
 #define SLEEP_TIME 10
 #define FRAGMENT_SIZE 512
 #define BUFFER_SIZE (sizeof(int) + FRAGMENT_SIZE)
-#define BASE_STATION_IP "127.0.0.1" 
-#define Neighbour_IP "127.0.0.1" 
+#define BASE_STATION_IP "127.0.0.1"
+#define Neighbour_IP "127.0.0.1"
+// #define BASE_STATION_IP "sta_main"
+// #define Neighbour_IP "satellite"
 #define BASE_STATION_PORT 8080
 #define SATELLITE_PORT 9999 
 #define Nei_PORT 10010
@@ -196,11 +198,11 @@ void signal_handler(int signum) {
 
 int main(){
     //printf("hi\n");
-    while(1){
-        printf("running\n");
-        fflush(stdout); 
-        sleep(1);
-    }
+    // while(1){
+    //     printf("running\n");
+    //     fflush(stdout); 
+    //     sleep(1);
+    // }
     struct sockaddr_in satellite_addr;
     Sate *satellite = (Sate*) malloc(sizeof(Sate));  // ✅ 确保 satellite 被分配内存
 
@@ -258,8 +260,7 @@ int main(){
 
 
     signal(SIGINT, signal_handler);
-    while (1) {
-        printf("hello\n");
+    while (!exit_flag) {
         sleep(1);
     }
     printf("Satellite shutting down...\n");

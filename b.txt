@@ -1,0 +1,5 @@
+docker build -t satellite-image -f Dockerfile.satellite .
+docker build -t sta-main-image -f Dockerfile.sta_main .
+
+docker run -d --name satellite --network satellite-network satellite-image
+docker run -d --name sta_main --network satellite-network sta_main-image
