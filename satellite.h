@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <csignal>
 
 #define MAX_NEIGHBORS 10
 #define DATA_SIZE 1024

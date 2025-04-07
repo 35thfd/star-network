@@ -42,3 +42,5 @@ docker run -d --name satellite4 \
 docker run -d --name satellite5 \
   --network my_network --ip 192.168.1.105 \
   satellite-image
+
+  #docker network inspect my_network

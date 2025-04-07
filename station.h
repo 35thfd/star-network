@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <string.h>
+#include <csignal>
 #include <arpa/inet.h>
 
 #define CNT 10   //数据片数量
@@ -49,7 +51,7 @@ public:
         
         // 设置服务器地址
         server_addr->sin_family = AF_INET;
-        server_addr->sin_addr.s_addr = inet_addr("192.168.1.100"); 
+        server_addr->sin_addr.s_addr = inet_addr("0.0.0.0"); 
         server_addr->sin_port = htons(PORT);
     
         // 绑定Socket到指定端口

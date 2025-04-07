@@ -1,6 +1,6 @@
-#ifndef MSG_CONFIRM
-#define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
-#endif
+// #ifndef MSG_CONFIRM
+// #define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
+// #endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,11 +9,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <string.h>
+#include <csignal>
 #include "station.h"  
 
 
 void send_response(int sockfd, const char* message, size_t message_size, struct sockaddr_in client_addr) {
-    sendto(sockfd, message, message_size, MSG_CONFIRM, (const struct sockaddr *)&client_addr, sizeof(client_addr));
+    sendto(sockfd, message, message_size, 0, (const struct sockaddr *)&client_addr, sizeof(client_addr));
     printf("Sent response to %s\n", inet_ntoa(client_addr.sin_addr));
 }
 

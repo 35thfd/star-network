@@ -6,6 +6,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <string.h>
+#include <csignal>
 #include "station.h"
 #include "satellite.h"
 
@@ -17,6 +19,7 @@
 char recv_packet[MAX_PACKET_SIZE];
 
 int main() {
+    printf("hello\n");
     int socket_fd;
     struct sockaddr_in base_station_addr;
     Station base_station;  
@@ -26,7 +29,7 @@ int main() {
         return EXIT_FAILURE;
     }
     base_station.sockfd = socket_fd;
-    
+
     memset(base_station.packet, 1, sizeof(base_station.packet));
 
     char buffer[1024];

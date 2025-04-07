@@ -1,6 +1,6 @@
-#ifndef MSG_CONFIRM
-#define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
-#endif
+// #ifndef MSG_CONFIRM
+// #define MSG_CONFIRM 0  // macOS 没有 MSG_CONFIRM，用 0 代替
+// #endif
 
 #include <stdio.h>
 #include <iostream>
@@ -11,6 +11,8 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <string.h>
+#include <csignal>
 #include "satellite.h"
 
 using namespace std;
@@ -19,11 +21,11 @@ using namespace std;
 #define SLEEP_TIME 10
 #define FRAGMENT_SIZE 512
 #define BUFFER_SIZE (sizeof(int) + FRAGMENT_SIZE)
-#define BASE_STATION_IP "192.168.1.100" 
+#define BASE_STATION_IP "192.168.1.5" 
 //#define Neighbour_IP "127.0.0.1" 
 #define BASE_STATION_PORT 8080
-#define SATELLITE_PORT 8080 
-#define Nei_PORT 8080
+#define SATELLITE_PORT 9999 
+#define Nei_PORT 10010
 
 volatile int exit_flag = 0;
 
@@ -151,10 +153,10 @@ void* receive_data(void *arg){
                         memcpy(satellite->data[fragment_id], data, 1024); 
                         //使用卫星见使用发送进程定期维护彼此数据保持有信息之后，在数据包信息发生变化后才发送请求信息
                         //数据包信息改变后立刻与所有连接的基站或其他卫星进行update
-                        if(source_addr.sin_port == htons(BASE_STATION_PORT))
+                        if(source_addr.sin_port == htons(BASE_STATION_PORT)&&source_addr.sin_addr.s_addr == inet_addr(BASE_STATION_IP))
                         {
-                            send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
                             //向基站发送请求
+                            send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
                         }
                         else
                         {
@@ -281,6 +283,7 @@ void* send_data(void *arg){
 }
 
 void* send_heartbeat(void *arg){
+    printf("send_heartbeat\n");
     Sate *satellite = (Sate *) arg;
     struct sockaddr_in broadcast_addr;
     int broadcast_enable = 1;
@@ -290,16 +293,9 @@ void* send_heartbeat(void *arg){
     memset(&broadcast_addr, 0, sizeof(broadcast_addr));
     broadcast_addr.sin_family = AF_INET;
     broadcast_addr.sin_port = htons(SATELLITE_PORT); // 目标端口
-    
-    //broadcast_addr.sin_addr.s_addr = inet_addr("255.255.255.255"); // 在统一子网内广播的广播
-    
-    char broadcast_ip[INET_ADDRSTRLEN];
-    get_broadcast_address("eth0", broadcast_ip);  // 替换为网卡端口名，如 wlan0,后续模拟用虚拟网口
-    if (inet_pton(AF_INET, broadcast_ip, &broadcast_addr.sin_addr) <= 0) {
-        perror("Invalid broadcast address");
-        exit(EXIT_FAILURE);
-    }
 
+    // 使用广播地址 192.168.1.255
+    broadcast_addr.sin_addr.s_addr = inet_addr("192.168.1.255"); // 广播地址
 
     // 允许 UDP 套接字进行广播
     if (setsockopt(satellite->sockfd, SOL_SOCKET, SO_BROADCAST, &broadcast_enable, sizeof(broadcast_enable)) < 0) {
@@ -323,10 +319,10 @@ void* send_heartbeat(void *arg){
     return NULL;
 }
 
-void signal_handler(int signum) {
-    printf("\nTerminating satellite...\n");
-    exit_flag = 1;
-}
+// void signal_handler(int signum) {
+//     printf("\nTerminating satellite...\n");
+//     exit_flag = 1;
+// }
 
 int main(){
     struct sockaddr_in satellite_addr;
@@ -368,23 +364,24 @@ int main(){
     //使用每隔一段时间就发送一次数据的方式发送请求信息
     //初步使用有来自发送处的返回数据包信息就意味着是卫星的一个neighbor
     //后续可以优化为星间路由代码
-    pthread_t send_thread;
-    if (pthread_create(&send_thread, NULL, send_data, (void*)satellite) != 0) {
-        perror("Failed to create send thread");
-        exit(EXIT_FAILURE);
-    }
-    pthread_detach(send_thread);
+    // pthread_t send_thread;
+    // if (pthread_create(&send_thread, NULL, send_data, (void*)satellite) != 0) {
+    //     perror("Failed to create send thread");
+    //     exit(EXIT_FAILURE);
+    // }
+    // pthread_detach(send_thread);
+    send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
     
     //发送心跳报文，维护邻居信息
     pthread_t heartbeat_thread;
-    if (pthread_create(&heartbeat_thread, NULL, send_data, (void*)satellite) != 0) {
+    if (pthread_create(&heartbeat_thread, NULL, send_heartbeat, (void*)satellite) != 0) {
         perror("Failed to create send thread");
         exit(EXIT_FAILURE);
     }
     pthread_detach(heartbeat_thread);
 
 
-    signal(SIGINT, signal_handler);
+    //signal(SIGINT, signal_handler);
     while (!exit_flag) {
         sleep(1);
     }
