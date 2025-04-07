@@ -1,0 +1,14 @@
+FROM ubuntu:latest
+
+WORKDIR /app
+
+RUN apt update && apt install -y g++ build-essential
+
+COPY . /app
+
+RUN g++ -o satellite satellite.cpp
+
+RUN chmod +x /app/satellite
+
+# CMD ["/app/satellite"]
+CMD ["/bin/bash", "-c", "sleep infinity"]
