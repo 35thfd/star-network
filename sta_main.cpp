@@ -1,76 +1,57 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
-#include <queue>
 #include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <string.h>
-#include <csignal>
-#include "station.h"
-#include "satellite.h"
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
-#define MAX_BUFFER_SIZE 1024
-#define BASE_STATION_PORT 12345  // 监听端口 
-#define MAX_SATELLITES 100
-#define MAX_PACKET_SIZE 256
-
-char recv_packet[MAX_PACKET_SIZE];
+#define BASE_STATION_PORT 8080
+#define DATA_SIZE 1024
+#define CNT 10  // 片段数量
 
 int main() {
-    printf("hello\n");
-    int socket_fd;
-    struct sockaddr_in base_station_addr;
-    Station base_station;  
+    int sockfd;
+    struct sockaddr_in broadcast_addr;
+    int broadcast_enable = 1;
 
-    if (base_station.setup_and_listen(&socket_fd, &base_station_addr) < 0) {
-        fprintf(stderr, "Failed to setup and listen\n");
-        return EXIT_FAILURE;
+    char packet[CNT][DATA_SIZE];
+
+    // 模拟初始化数据
+    for (int i = 0; i < CNT; i++) {
+        memset(packet[i], 'A' + i, DATA_SIZE);
     }
-    base_station.sockfd = socket_fd;
 
-    memset(base_station.packet, 1, sizeof(base_station.packet));
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
 
-    char buffer[1024];
-    struct sockaddr_in satellite_addr;
-    socklen_t addr_len = sizeof(satellite_addr);
+    if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcast_enable, sizeof(broadcast_enable)) < 0) {
+        perror("Error setting broadcast option");
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&broadcast_addr, 0, sizeof(broadcast_addr));
+    broadcast_addr.sin_family = AF_INET;
+    broadcast_addr.sin_port = htons(BASE_STATION_PORT);
+    broadcast_addr.sin_addr.s_addr = inet_addr("192.168.1.255");  // 广播地址（视网络环境修改）
 
     while (1) {
-        int n = recvfrom(socket_fd, (char *)buffer, 1024, MSG_WAITALL, 
-                         (struct sockaddr *)&satellite_addr, &addr_len);
-        if (n < 0) {
-            perror("recvfrom failed");
-            continue;
-        }
-        //buffer[n] = '\0';
-        printf("Base Station: Received Control Message from Satellite: %s\n", buffer);
-        
-        //创建传输进程
-        pthread_t process_thread;
-        ProcessData *data = (ProcessData *)malloc(sizeof(ProcessData));
-        data->control_message = (char*)malloc(n);  // 为接收的数据分配内存
-        if (data->control_message == NULL) {
-            perror("Memory allocation failed");
-            continue;  // 如果内存分配失败，跳过此次处理
-        }
+        for (int i = 1; i <= CNT; i++) {
+            char buffer[4 + 4 + DATA_SIZE];
+            int kind = 0;  // 数据包
+            int fragment_id = i;
+            memcpy(buffer, &kind, sizeof(int));
+            memcpy(buffer + sizeof(int), &fragment_id, sizeof(int));
+            memcpy(buffer + sizeof(int) * 2, packet[i], DATA_SIZE);
 
-        memcpy(data->control_message, buffer, n);  
-        data->socket_fd = socket_fd;
-        data->satellite_addr = satellite_addr;
-        data->base_station = &base_station;
-
-        if (pthread_create(&process_thread, NULL, Station::process_message, (void*)data) != 0) {
-            perror("Failed to create process thread");
-            free(data->control_message);
-            free(data);
-            continue;
+            sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&broadcast_addr, sizeof(broadcast_addr));
+            printf("Broadcasted fragment %d\n", fragment_id);
+            usleep(10000);  // 每片间隔短一点，避免太密集
         }
-
-        pthread_detach(process_thread);
-        sleep(1);
+        sleep(2); // 每轮间隔
     }
 
-    close(socket_fd);
+    close(sockfd);
     return 0;
 }
