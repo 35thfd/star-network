@@ -9,9 +9,14 @@
 #define SATELLITE_PORT 8080
 #define DATA_SIZE 1024
 #define CNT 10
+#define BASE_STATION_IP "192.168.1.5"  
+#define BASE_STATION_PORT 8888
 
 char data[CNT + 1][DATA_SIZE];
 int received[CNT + 1] = {0};
+
+int recv_count_total = 0;
+int send_count_total = 0;
 
 void* receive_thread(void* arg) {
     int sockfd = *(int*)arg;
@@ -22,6 +27,8 @@ void* receive_thread(void* arg) {
     while (1) {
         int n = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&sender, &len);
         if (n < 0) continue;
+
+        recv_count_total++;//统计频次
 
         int kind, fragment_id;
         memcpy(&kind, buffer, sizeof(int));
@@ -69,7 +76,21 @@ int main() {
             if (!received[i]) complete = 0;
         }
         if (complete) {
-            printf("All fragments received!\n");
+            printf("🍔 All fragments received!\n");
+            printf("🐵🐵🐵🐵🐵 received: %d\n", recv_count_total);
+            printf("🦍🦍🦍🦍🦍 sent:     %d\n", send_count_total); 
+
+            struct sockaddr_in base_station_addr;
+            memset(&base_station_addr, 0, sizeof(base_station_addr));
+            base_station_addr.sin_family = AF_INET;
+            base_station_addr.sin_port = htons(BASE_STATION_PORT);
+            inet_pton(AF_INET, BASE_STATION_IP, &base_station_addr.sin_addr);
+
+            int finish_signal = 99;
+            sendto(sockfd, &finish_signal, sizeof(int), 0, 
+                (struct sockaddr*)&base_station_addr, sizeof(base_station_addr));
+
+            printf("🚀 Sent finish signal to base station.\n");
             break;
         }
     }
