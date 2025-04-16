@@ -36,6 +36,17 @@ int main() {
     struct sockaddr_in satellite_addr;
     socklen_t addr_len = sizeof(satellite_addr);
 
+    pthread_t stats_thread;
+    pthread_create(&stats_thread, NULL, [](void* arg) -> void* {
+        Station* bs = (Station*)arg;
+        while (true) {
+            sleep(1);
+            bs->print_send_statistics();
+        }
+        return nullptr;
+    }, (void*)&base_station);
+
+
     while (1) {
         int n = recvfrom(socket_fd, (char *)buffer, 1024, MSG_WAITALL, 
                          (struct sockaddr *)&satellite_addr, &addr_len);

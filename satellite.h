@@ -6,6 +6,8 @@
 #define MAX_NEIGHBORS 10
 #define DATA_SIZE 1024
 
+int sent;
+
 // 定义卫星类型
 typedef enum {
     SATELLITE_DIAMOND,  // 菱形卫星：只接收不发送
@@ -34,6 +36,8 @@ class Sate {
         int data[1024][100000]; 
         int missing_blocks[1024];  
         int missing_count;
+        int send_count = 0;
+        int recv_count = 0;
 
         Satellite neighbors[MAX_NEIGHBORS];
 
@@ -84,4 +88,7 @@ class Sate {
     }
     
 };
+
+
+
 

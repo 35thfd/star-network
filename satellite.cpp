@@ -69,6 +69,11 @@ void send_control_info(int sockfd, struct sockaddr_in *des_addr, int *missing_bl
     sendto(sockfd, buffer, sizeof(int) * 2 + missing_count * sizeof(int), MSG_CONFIRM, 
            (const struct sockaddr *)des_addr, sizeof(*des_addr));
 
+    //satellite->send_count++;
+    //printf("[SEND] 当前发送总次数: %d\n", satellite->send_count);
+    sent++;
+    printf("🐶satellite sent🐶: %d\n", sent);
+
     printf("Sent control info: %d fragments\n", missing_count);
 }
 
@@ -120,6 +125,9 @@ void* receive_data(void *arg){
             perror("recvfrom failed");
             continue;
         }
+
+        satellite->recv_count++;
+        printf("🦍satellite received🦍: %d\n", satellite->recv_count);
         
         int kind;
         memcpy(&kind, control_buffer, sizeof(int)); 
@@ -206,7 +214,10 @@ void* receive_data(void *arg){
 
                 sendto(satellite->sockfd, send_buffer, sizeof(int) * 2 + data_size, MSG_CONFIRM, 
                     (const struct sockaddr *)&source_addr, sizeof(source_addr));
+                sent++;
+                printf("🐶satellite sent🐶: %d\n", sent);
             }
+            
 
             free(missing_fragments);
         }

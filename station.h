@@ -16,6 +16,9 @@
 #define PORT 8080 // 服务器监听端口
 #define DATA_SIZE 1024
 
+
+
+
 // 报文格式
 typedef struct {
     uint16_t satellite_id;  
@@ -34,9 +37,12 @@ public:
     int cnt;               
     pthread_t monitor_thread;
     int sockfd;
+    int send_count[CNT];  //统计频次
+
 
     Station() {
         cnt = CNT;
+        memset(send_count, 0, sizeof(send_count));
         init_queue();
     }
     
@@ -127,6 +133,7 @@ public:
     }
 
     static void* process_message(void* arg);
+    void print_send_statistics();
 };
 
 typedef struct {

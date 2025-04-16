@@ -41,6 +41,7 @@ void* Station::process_message(void *arg) {
         int fragment_id = base_station->check(missing_fragments, cnt);
         printf("choose fragment %d send to satellite address: %s:%d\n",  fragment_id, inet_ntoa(satellite_addr.sin_addr), ntohs(satellite_addr.sin_port));
         if (fragment_id != -1) {
+            base_station->send_count[fragment_id-1]++;
             size_t data_size = DATA_SIZE;
             char buffer[sizeof(int) * 2 + data_size];
     
@@ -64,4 +65,13 @@ void* Station::process_message(void *arg) {
     free(data->control_message);
     free(data);
     return NULL;
+}
+
+
+void Station::print_send_statistics() {
+    printf("=== Fragment Send Statistics ===\n");
+    for (int i = 0; i < cnt; i++) {
+        printf("🐷Fragment %d sent %d times🐷\n", i + 1, send_count[i]);
+    }
+    printf("================================\n");
 }
