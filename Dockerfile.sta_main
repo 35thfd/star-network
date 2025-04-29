@@ -8,7 +8,7 @@ COPY . /app
 
 RUN g++ station.cpp sta_main.cpp -o station -pthread 
 
-RUN chmod +x /app/station
+RUN chmod +x /app/station /app/control.sh
 
 # CMD ["/app/station"]
 CMD ["/bin/bash", "-c", "sleep infinity"]

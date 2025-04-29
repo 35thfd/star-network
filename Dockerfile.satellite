@@ -8,7 +8,7 @@ COPY . /app
 
 RUN g++ -o satellite satellite.cpp
 
-RUN chmod +x /app/satellite
+RUN chmod +x /app/satellite /app/control.sh
 
 # CMD ["/app/satellite"]
 CMD ["/bin/bash", "-c", "sleep infinity"]

@@ -31,6 +31,16 @@ volatile int exit_flag = 0;
 
 int received_count = 0;
 
+void interrupt_link(const std::string& self_container, const std::string& target_ip) {
+    std::string command = "./control.sh " + self_container + " " + target_ip + " block";
+    system(command.c_str());
+}
+
+void restore_link(const std::string& self_container, const std::string& target_ip) {
+    std::string command = "./control.sh " + self_container + " " + target_ip + " unblock";
+    system(command.c_str());
+}
+
 void get_broadcast_address(char *interface_name, char *broadcast_ip) {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) {

@@ -4,8 +4,8 @@
 # 构建 satellite-image 镜像，支持 amd64 和 arm64
 
 
-# docker build -t satellite-image -f Dockerfile.satellite .
-# docker build -t sta-main-image -f Dockerfile.sta_main .
+docker build -t satellite-image -f Dockerfile.satellite .
+docker build -t sta-main-image -f Dockerfile.sta_main .
 
 docker rm -f satelliteax
 docker rm -f satellitebx
