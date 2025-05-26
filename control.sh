@@ -1,28 +1,35 @@
 #!/bin/bash
 
-# ./control.sh <src_container> <dst_ip> <action>
-# action = block（断开）| unblock（恢复）
-
-SRC=$1
-DST_IP=$2
+# 参数解析
+SRC_CONTAINER=$1
+TARGET_IP=$2
 ACTION=$3
 
-PID=$(docker inspect -f '{{.State.Pid}}' $SRC)
-NETNS_DIR="/var/run/netns"
+if [ -z "$SRC_CONTAINER" ] || [ -z "$TARGET_IP" ] || [ -z "$ACTION" ]; then
+    echo "Usage: $0 <source_container> <target_ip> <block|unblock>"
+    exit 1
+fi
 
-# 创建 netns 目录和软链接
-mkdir -p $NETNS_DIR
-ln -sf /proc/$PID/ns/net $NETNS_DIR/$SRC
+# 获取源容器的网络命名空间 PID
+SRC_PID=$(docker inspect -f '{{.State.Pid}}' "$SRC_CONTAINER")
+if [ -z "$SRC_PID" ]; then
+    echo "Failed to get PID for container $SRC_CONTAINER"
+    exit 1
+fi
 
-if [ "$ACTION" = "block" ]; then
-  ip netns exec $SRC tc qdisc add dev eth0 root handle 1: prio
-  ip netns exec $SRC tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dst $DST_IP/32 flowid 1:1
-  ip netns exec $SRC tc qdisc add dev eth0 parent 1:1 handle 10: netem loss 100%
-  echo "Blocked $SRC from accessing $DST_IP"
-elif [ "$ACTION" = "unblock" ]; then
-  ip netns exec $SRC tc qdisc del dev eth0 root
-  echo "Restored $SRC access to $DST_IP"
+# 定义 network namespace 路径
+NETNS_PATH="/proc/$SRC_PID/ns/net"
+
+# 设置 tc 命令（注意必须指定容器内的 eth0）
+if [ "$ACTION" == "block" ]; then
+    echo "Blocking $TARGET_IP from $SRC_CONTAINER"
+    nsenter --net=$NETNS_PATH tc qdisc add dev eth0 root handle 1: prio
+    nsenter --net=$NETNS_PATH tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dst $TARGET_IP flowid :2
+    nsenter --net=$NETNS_PATH tc qdisc add dev eth0 parent 1:2 handle 20: netem loss 100%
+elif [ "$ACTION" == "unblock" ]; then
+    echo "Unblocking $TARGET_IP from $SRC_CONTAINER"
+    nsenter --net=$NETNS_PATH tc qdisc del dev eth0 root
 else
-  echo "Unknown action: $ACTION"
-  exit 1
+    echo "Invalid action: $ACTION (must be block or unblock)"
+    exit 1
 fi
