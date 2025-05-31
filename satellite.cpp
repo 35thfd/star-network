@@ -25,7 +25,7 @@ using namespace std;
 #define SLEEP_TIME 10
 #define FRAGMENT_SIZE 512
 #define BUFFER_SIZE (sizeof(int) + FRAGMENT_SIZE)
-#define BASE_STATION_IP "192.168.1.5" 
+#define BASE_STATION_IP "192.168.1.2" 
 //#define Neighbour_IP "127.0.0.1" 
 #define BASE_STATION_PORT 8080
 #define SATELLITE_PORT 9999 
@@ -369,7 +369,7 @@ void* receive_data(void *arg){
             // 2. 检查发送方是否为已"认识"的邻居，并据此处理其缺失信息和 last_seen
             int neighbor_idx = -1;
             bool sender_is_currently_stable = false;
-            
+
             char sender_ip[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &(source_addr.sin_addr), sender_ip, INET_ADDRSTRLEN);
             int sender_port = ntohs(source_addr.sin_port);
@@ -588,6 +588,80 @@ void* send_heartbeat(void *arg){
     return NULL;
 }
 
+void* neighbor_management_routine(void *arg) {
+    Sate *satellite = (Sate *)arg;
+    const int RECENCY_THRESHOLD_SECONDS_FOR_STABILITY = 10; // 用户定义：最近10秒内连接以保持稳定
+    const int CHECK_INTERVAL_SECONDS = 2;                  // 此线程运行检查的频率（更频繁）
+
+    printf("Starting neighbor_management_routine thread\n");
+
+    while (!exit_flag) {
+        sleep(CHECK_INTERVAL_SECONDS);
+        time_t current_time = time(NULL);
+        bool P_freq_update_needed = false;
+
+        pthread_mutex_lock(&satellite->neighbor_lock);
+        for (auto it = satellite->neighbors.begin(); it != satellite->neighbors.end(); ) {
+            NeighborInfo &neighbor = *it;
+
+            // 1. 检查是否因超时而移除
+            // NEIGHBOR_TIMEOUT_SECONDS 在 satellite.h 中为 5秒
+            if (current_time - neighbor.last_seen > NEIGHBOR_TIMEOUT_SECONDS) { //
+                printf("Neighbor %s:%d (Stable: %d) timed out (last_seen: %ld, current: %ld). Removing.\n",
+                       neighbor.ip, neighbor.port, neighbor.is_stable, neighbor.last_seen, current_time);
+                
+                bool P_was_stable = neighbor.is_stable;
+                std::string P_neighbor_key_to_remove = make_neighbor_key(neighbor.ip, neighbor.port);
+                
+                it = satellite->neighbors.erase(it); // 删除并获取下一个有效迭代器
+
+                if (P_was_stable) {
+                    P_freq_update_needed = true; // 标记在此循环外进行频率更新
+                }
+                
+                // 同时从 neighbor_missing_data 中移除
+                pthread_mutex_lock(&satellite->missing_data_lock); //
+                satellite->neighbor_missing_data.erase(P_neighbor_key_to_remove); //
+                pthread_mutex_unlock(&satellite->missing_data_lock); //
+                printf("  Removed %s from neighbor_missing_data.\n", P_neighbor_key_to_remove.c_str());
+                continue; 
+            }
+
+            // 2. 检查是否变为稳定状态（如果尚未稳定）
+            // STABILITY_THRESHOLD_SECONDS 在 satellite.h 中为 15秒
+            if (!neighbor.is_stable) { //
+                if ((current_time - neighbor.established_time > STABILITY_THRESHOLD_SECONDS) && //
+                    (current_time - neighbor.last_seen < RECENCY_THRESHOLD_SECONDS_FOR_STABILITY)) {
+                    
+                    neighbor.is_stable = true; //
+                    P_freq_update_needed = true; // 标记进行频率更新
+                    printf("Neighbor %s:%d is now STABLE. (Established: %ld, LastSeen: %ld, Current: %ld)\n",
+                           neighbor.ip, neighbor.port, neighbor.established_time, neighbor.last_seen, current_time);
+                }
+            }
+            // 可选：如果 last_seen > RECENCY_THRESHOLD 但尚未超时，则失去稳定性的逻辑
+            // else { // 已经稳定
+            //    if (current_time - neighbor.last_seen >= RECENCY_THRESHOLD_SECONDS_FOR_STABILITY) {
+            //        neighbor.is_stable = false;
+            //        P_freq_update_needed = true;
+            //        printf("Stable neighbor %s:%d became UNSTABLE due to inactivity.\n", neighbor.ip, neighbor.port);
+            //    }
+            // }
+            ++it;
+        }
+        pthread_mutex_unlock(&satellite->neighbor_lock);
+
+        if (P_freq_update_needed) {
+            pthread_mutex_lock(&satellite->frequency_lock); //
+            satellite->frequency_needs_update = true; //
+            printf("  Neighbor management triggered frequency_needs_update.\n");
+            pthread_mutex_unlock(&satellite->frequency_lock); //
+        }
+    }
+    printf("Exiting neighbor_management_routine thread\n");
+    return NULL;
+}
+
 // void signal_handler(int signum) {
 //     printf("\nTerminating satellite...\n");
 //     exit_flag = 1;
@@ -653,6 +727,16 @@ int main(){
     }
     pthread_detach(heartbeat_thread);
 
+    if (pthread_create(&satellite->neighbor_management_thread_id, NULL, neighbor_management_routine, (void*)satellite) != 0) { //
+        perror("Failed to create neighbor_management_routine thread");
+        // ... 正确清理 ...
+        exit_flag = 1; // 通知其他线程退出
+        sleep(1);
+        close(satellite->sockfd);
+        delete satellite;
+        exit(EXIT_FAILURE);
+    }
+    pthread_detach(satellite->neighbor_management_thread_id); 
 
     //signal(SIGINT, signal_handler);
     while (!exit_flag) {

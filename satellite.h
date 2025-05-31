@@ -79,6 +79,8 @@ typedef struct {
     int frequency[1024]; 
 } Satellite;
 
+std::string make_neighbor_key(const char* ip, int port);
+
 class Sate {
     public:
         SatelliteType type;  
@@ -146,33 +148,10 @@ class Sate {
     }
 
     // 查找已确认邻居的索引
-    std::string make_neighbor_key(const char* ip, int port);
     void calculate_frequency_and_prioritize();
     void send_prioritized_missing_list(int sock, const struct sockaddr_in* dest_addr);
     static bool compare_block_frequency(const BlockFrequency& a, const BlockFrequency& b);
 
-    void add_or_update_neighbor(const char* ip, int port, time_t current_time) {
-        pthread_mutex_lock(&neighbor_lock);
-        int index = find_neighbor_index(ip, port);
-        if (index != -1) {
-            neighbors[index].last_seen = current_time;
-        }
-        else {
-            NeighborInfo new_neighbor;
-            strncpy(new_neighbor.ip, ip, INET_ADDRSTRLEN - 1);
-            new_neighbor.ip[INET_ADDRSTRLEN - 1] = '\0';
-            new_neighbor.neighbor_port = port;
-            new_neighbor.last_seen = current_time;
-            neighbors.push_back(new_neighbor);
-            // 注意：这里无法轻易获得新邻居的 SatelliteID (如果还需要的话)
-            // 如果 map 的 key 只需要 IP:Port，则没问题
-            pthread_mutex_lock(&frequency_lock);
-            frequency_needs_update = true; // 新邻居加入
-            pthread_mutex_unlock(&frequency_lock);
-            printf("  添加新邻居 %s:%d。当前邻居数: %lu\n", ip, port, neighbors.size());
-        }
-        pthread_mutex_unlock(&neighbor_lock);
-    }
     
 
     void update_neighbor_missing_info(const std::string& neighbor_key, const int* blocks, int count, bool trigger_freq_recalc) {
