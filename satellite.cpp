@@ -98,7 +98,7 @@ void Sate::calculate_frequency_and_prioritize() {
     // --- 2. 统计自身缺失的块，计入全局频次 ---
     // 注意：这里的 this->frequency 数组是用来计算 *全局* 缺失频次的，
     // 而不是仅本卫星的。本卫星的缺失块是最终排序的对象。
-    for (int i = 0; i < this->missing_count; ++i) {
+    for (int i = 1; i <= this->missing_count; ++i) {
         int block_id = this->missing_blocks[i];
         if (block_id >= 0 && block_id < 1024) { // 基本的边界检查
             this->frequency[block_id]++;
@@ -139,13 +139,13 @@ void Sate::calculate_frequency_and_prioritize() {
 
     pthread_mutex_unlock(&this->missing_data_lock);
     pthread_mutex_unlock(&this->neighbor_lock);
-    // printf("  共计 %d 个稳定邻居的缺失信息已计入频次统计。\n", stable_neighbors_counted);
+    printf("  共计 %d 个稳定邻居的缺失信息已计入频次统计。\n", stable_neighbors_counted);
 
 
     // --- 4. 根据计算出的全局频次，对本卫星“自身缺失的块”进行排序 ---
     //    目标是得到 this->prioritized_missing_list
     std::vector<BlockFrequency> self_missing_blocks_with_their_global_freq;
-    for (int i = 0; i < this->missing_count; ++i) {
+    for (int i = 1; i <= this->missing_count; ++i) {
         int block_id = this->missing_blocks[i];
         if (block_id >= 0 && block_id < 1024) { // 再次进行边界检查
             // 对于本卫星缺失的每个块，查找它在全局频次统计中的值
@@ -163,13 +163,34 @@ void Sate::calculate_frequency_and_prioritize() {
     for (const auto& bf : self_missing_blocks_with_their_global_freq) {
         this->prioritized_missing_list.push_back(bf.block_id);
     }
+    
+    std::vector<int> filtered_list; // 创建一个新的 vector 来存储过滤后的结果
+    // 外层循环：遍历 prioritized_missing_list 中的每个元素
+    for (size_t i = 0; i < this->prioritized_missing_list.size(); ++i) {
+        int block_id_in_pml = this->prioritized_missing_list[i];
+        bool found_in_missing_blocks = false;
 
+        // 内层循环：检查 block_id_in_pml 是否在 this->missing_blocks 中
+        for (int j = 1; j <= this->missing_count; ++j) {
+            if (this->missing_blocks[j] == block_id_in_pml) {
+                found_in_missing_blocks = true;
+                break; // 找到了，就不需要继续在 missing_blocks 中查找了
+            }
+        }
+
+        // 如果 block_id_in_pml 确实在最新的 this->missing_blocks 中，则保留它
+        if (found_in_missing_blocks) {
+            filtered_list.push_back(block_id_in_pml);
+        }
+    }
+    // 用过滤后的列表替换旧的 prioritized_missing_list
+    this->prioritized_missing_list = filtered_list;
     // 打印调试信息 (可选)
-    // printf("  频次计算和优先级排序完成。本卫星的优先缺失列表 (%zu 个条目): ", this->prioritized_missing_list.size());
-    // for(int id : this->prioritized_missing_list) {
-    //     printf("%d(全局freq:%d) ", id, (id >=0 && id < 1024 ? this->frequency[id] : -1));
-    // }
-    // printf("\n");
+    printf("  频次计算和优先级排序完成。本卫星的优先缺失列表 (%zu 个条目): ", this->prioritized_missing_list.size());
+    for(int id : this->prioritized_missing_list) {
+        printf("%d(全局freq:%d) ", id, (id >=0 && id < 1024 ? this->frequency[id] : -1));
+    }
+    printf("\n");
 
     // --- 6. 更新标志位 ---
     // 这一步应该在调用此函数的临界区内完成，或者此函数是唯一修改它的地方（在持有frequency_lock时）
@@ -196,6 +217,7 @@ void Sate::send_prioritized_missing_list(int sock, const struct sockaddr_in* des
     // 1. 准备消息内容
     int message_type = 1; // Type 1 消息
     int count = static_cast<int>(this->prioritized_missing_list.size());
+    printf("counnnnnt %d\n", count);
 
     // 计算缓冲区大小: 消息类型(int) + 数量(int) + 块ID列表(count * int)
     size_t buffer_size = sizeof(int) + sizeof(int) + (count * sizeof(int));
@@ -211,7 +233,7 @@ void Sate::send_prioritized_missing_list(int sock, const struct sockaddr_in* des
     char* ptr = buffer;
     memcpy(ptr, &message_type, sizeof(int));
     ptr += sizeof(int);
-    memcpy(ptr, &count, sizeof(int));
+    memcpy(ptr, &this->missing_count, sizeof(int));
     ptr += sizeof(int);
     memcpy(ptr, this->prioritized_missing_list.data(), count * sizeof(int));
 
@@ -219,8 +241,13 @@ void Sate::send_prioritized_missing_list(int sock, const struct sockaddr_in* des
     pthread_mutex_unlock(&this->frequency_lock);
 
     // 3. 发送消息
-    ssize_t bytes_sent = sendto(sock, buffer, buffer_size, 0,
-                                (const struct sockaddr*)dest_addr, sizeof(struct sockaddr_in));
+    ssize_t bytes_sent = sendto(sock, buffer, buffer_size, 0,(const struct sockaddr*)dest_addr, sizeof(struct sockaddr_in));
+
+    cout << "Control weixing sent: ";
+    for (int i = 0; i < sizeof(int) * 2 + missing_count * sizeof(int); i++) {
+        printf("%02x ", (unsigned char)buffer[i]);
+    }
+    printf("\n");
 
     if (bytes_sent < 0) {
         perror("send_prioritized_missing_list: sendto 失败");
@@ -243,7 +270,7 @@ void send_control_info(int sockfd, struct sockaddr_in *des_addr, int *missing_bl
     memcpy(buffer, &temp_i, sizeof(int));  
     memcpy(buffer + sizeof(int), &missing_count, sizeof(int)); 
     memcpy(buffer + sizeof(int) * 2, (missing_blocks+1), missing_count * sizeof(int));
-    cout << "Control info sent: ";
+    cout << "Control station: ";
     for (int i = 0; i < sizeof(int) * 2 + missing_count * sizeof(int); i++) {
         printf("%02x ", (unsigned char)buffer[i]);
     }
@@ -264,29 +291,29 @@ void send_to_base_station(int sockfd, int* missing_blocks, int missing_count){
         perror("Invalid base station address");
         exit(EXIT_FAILURE);
     }
-
+    printf("Sending control info to base station at %s:%d\n", BASE_STATION_IP, BASE_STATION_PORT);
     send_control_info(sockfd, &base_station_addr, missing_blocks, missing_count);
 }
 
-void send_to_neighbor_satellite(int sockfd, int* missing_blocks, int missing_count, int neighborcount, Satellite neighbors[]) {
-    struct sockaddr_in neighbor_satellite_addr;
+// void send_to_neighbor_satellite(int sockfd, int* missing_blocks, int missing_count, int neighborcount, Satellite neighbors[]) {
+//     struct sockaddr_in neighbor_satellite_addr;
 
-    for (int i = 0; i < neighborcount; i++) {
-        memset(&neighbor_satellite_addr, 0, sizeof(neighbor_satellite_addr));
-        neighbor_satellite_addr.sin_family = AF_INET;
-        neighbor_satellite_addr.sin_port = htons(neighbors[i].neighbor_ports);  // 目标端口
+//     for (int i = 0; i < neighborcount; i++) {
+//         memset(&neighbor_satellite_addr, 0, sizeof(neighbor_satellite_addr));
+//         neighbor_satellite_addr.sin_family = AF_INET;
+//         neighbor_satellite_addr.sin_port = htons(neighbors[i].neighbor_ports);  // 目标端口
 
-        // 将字符串 IP 地址转换为 sockaddr 结构
-        if (inet_pton(AF_INET, neighbors[i].neighborip, &neighbor_satellite_addr.sin_addr) <= 0) {
-            perror("Invalid neighbor IP address");
-            continue;  // 跳过这个邻居，继续下一个
-        }
+//         // 将字符串 IP 地址转换为 sockaddr 结构
+//         if (inet_pton(AF_INET, neighbors[i].neighborip, &neighbor_satellite_addr.sin_addr) <= 0) {
+//             perror("Invalid neighbor IP address");
+//             continue;  // 跳过这个邻居，继续下一个
+//         }
 
-        // 发送控制信息
-        send_control_info(sockfd, &neighbor_satellite_addr, missing_blocks, missing_count);
-        printf("Sent control info to neighbor: %s:%d\n", neighbors[i].neighborip, neighbors[i].neighbor_ports);
-    }
-}
+//         // 发送控制信息
+//         send_control_info(sockfd, &neighbor_satellite_addr, missing_blocks, missing_count);
+//         printf("Sent control info to neighbor: %s:%d\n", neighbors[i].neighborip, neighbors[i].neighbor_ports);
+//     }
+// }
 
 //TODO:更改报文结构，维护第一位为报文区分
 void* receive_data(void *arg){
@@ -297,6 +324,11 @@ void* receive_data(void *arg){
     socklen_t addr_len = sizeof(source_addr);
     
     while (1) {
+        if(satellite->missing_count == 0)  // 如果没有缺失的分片，直接跳出循环
+        {
+            printf("all data received: stop");
+            break;
+        }
         int n = recvfrom(satellite->sockfd, control_buffer, BUFFER_SIZE, MSG_WAITALL,  (struct sockaddr *)&source_addr, &addr_len);
         if (n < 0) {
             perror("recvfrom failed");
@@ -319,41 +351,129 @@ void* receive_data(void *arg){
         {
         //case 0 接收到的是数据包信息
         //发送的数据格式：[4字节 分片编号] + [实际分片数据]
+        // case 0:
+        //     {
+        //         int fragment_id;
+        //         memcpy(&fragment_id, control_buffer + sizeof(int), sizeof(int));  // 解析分片编号
+        //         char *data = buffer + sizeof(int);  // 解析分片数据
+        //         printf("Received fragment %d from %d\n", fragment_id, ntohs(source_addr.sin_port));
+                
+        //         int a;
+        //         if(satellite->missing_count != 0)  
+        //             a = satellite->missing_blocks[satellite->missing_count];
+
+        //         for(int i = 1; i <= satellite->missing_count; i++)
+        //         {
+        //             if(satellite->missing_blocks[i] == fragment_id)
+        //             {
+        //                 satellite->missing_blocks[i] = a;
+        //                 satellite->missing_count--;
+        //                 if(satellite->missing_count == 0)  // 如果没有缺失的分片，直接跳出循环
+        //                 {
+        //                     printf("all data received: stop");
+        //                     return NULL;
+        //                 }
+        //                 memcpy(satellite->data[fragment_id], data, 1024); 
+        //                 //使用卫星见使用发送进程定期维护彼此数据保持有信息之后，在数据包信息发生变化后才发送请求信息
+        //                 //数据包信息改变后立刻与所有连接的基站或其他卫星进行update
+        //                 if(source_addr.sin_port == htons(BASE_STATION_PORT)&&source_addr.sin_addr.s_addr == inet_addr(BASE_STATION_IP))
+        //                 {
+        //                     //向基站发送请求
+        //                     send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
+        //                 }
+        //                 else
+        //                 {
+        //                     //向邻居卫星发送请求
+        //                     //send_control_info(satellite->sockfd, &source_addr, satellite->missing_blocks, satellite->missing_count);
+        //                     satellite->send_prioritized_missing_list(satellite->sockfd, &source_addr);
+        //                 }
+        //                 break;
+        //             }
+        //         }
+        //     }
+        // break;
         case 0:
             {
                 int fragment_id;
                 memcpy(&fragment_id, control_buffer + sizeof(int), sizeof(int));  // 解析分片编号
-                char *data = buffer + sizeof(int);  // 解析分片数据
-                printf("Received fragment %d from %d\n", fragment_id, ntohs(source_addr.sin_port));
-                
-                int a;
-                if(satellite->missing_count != 0)  
-                    a = satellite->missing_blocks[satellite->missing_count];
+                char *data_payload = buffer + sizeof(int);  // 解析分片数据
+                printf("Received fragment %d from %s:%d\n", fragment_id, inet_ntoa(source_addr.sin_addr), ntohs(source_addr.sin_port));
+                // printf("Current missing_count before processing: %d\n", satellite->missing_count);
 
-                for(int i = 1; i <= satellite->missing_count; i++)
-                {
-                    if(satellite->missing_blocks[i] == fragment_id)
-                    {
-                        satellite->missing_blocks[i] = a;
+                bool processed_this_fragment = false; // 标志位：此分片是否被成功处理
+
+                // --- 1. 添加锁来保护 missing_blocks 和 missing_count 的修改 ---
+                pthread_mutex_lock(&satellite->missing_data_lock); // <--- LOCKING
+
+                // 检查并处理缺失的分片
+                for (int i = 1; i <= satellite->missing_count; i++) { // 假设 missing_blocks 索引从1开始
+                    if (satellite->missing_blocks[i] == fragment_id) {
+                        // 从缺失列表中移除该分片
+                        // (使用你原来的方法：将最后一个元素移到当前位置)
+                        satellite->missing_blocks[i] = satellite->missing_blocks[satellite->missing_count];
                         satellite->missing_count--;
-                        memcpy(satellite->data[fragment_id], data, 1024); 
-                        //使用卫星见使用发送进程定期维护彼此数据保持有信息之后，在数据包信息发生变化后才发送请求信息
-                        //数据包信息改变后立刻与所有连接的基站或其他卫星进行update
-                        if(source_addr.sin_port == htons(BASE_STATION_PORT)&&source_addr.sin_addr.s_addr == inet_addr(BASE_STATION_IP))
-                        {
-                            //向基站发送请求
-                            send_to_base_station(satellite->sockfd, satellite->missing_blocks, satellite->missing_count);
-                        }
-                        else
-                        {
-                            //向邻居卫星发送请求
-                            send_control_info(satellite->sockfd, &source_addr, satellite->missing_blocks, satellite->missing_count);
-                        }
-                        break;
+                        processed_this_fragment = true; // 标记已处理
+                        // printf("Processed fragment %d. New missing_count: %d\n", fragment_id, satellite->missing_count);
+
+                        // 复制数据到卫星的存储区
+                        memcpy(satellite->data[fragment_id], data_payload, DATA_SIZE); // 确保 DATA_SIZE 是正确的
+
+                        break; // 已找到并处理，跳出 for 循环
                     }
                 }
+
+                int current_missing_count_after_processing = satellite->missing_count; // 获取更新后的计数值
+
+                pthread_mutex_unlock(&satellite->missing_data_lock); // <--- UNLOCKING
+                // --- 锁保护结束 ---
+
+
+                if (processed_this_fragment) {
+                    // 如果所有数据都已接收完毕
+                    if (current_missing_count_after_processing == 0) {
+                        printf("All data received: stop\n");
+                        return NULL; // 结束 receive_data 线程
+                    }
+
+                    // --- 2. 如果接收到的分片自己之前没有（即 processed_this_fragment 为 true），
+                    // 并且仍然有其他缺失，则触发频次统计 ---
+                    // (实际上，只要 processed_this_fragment 且没有全部收完，就应该触发)
+                    pthread_mutex_lock(&satellite->frequency_lock);
+                    satellite->frequency_needs_update = true;
+                    // printf("Fragment %d processed, flagging for frequency update. Still missing %d blocks.\n",
+                    //        fragment_id, current_missing_count_after_processing);
+                    pthread_mutex_unlock(&satellite->frequency_lock);
+
+                    // 后续的发送逻辑，原样保留你 case 0 中的代码
+                    if (source_addr.sin_port == htons(BASE_STATION_PORT) && source_addr.sin_addr.s_addr == inet_addr(BASE_STATION_IP)) {
+                        //向基站发送请求
+                        send_to_base_station(satellite->sockfd, satellite->missing_blocks, current_missing_count_after_processing);
+                    } else {
+                        //向邻居卫星发送请求
+                        // 在调用 send_prioritized_missing_list 之前，通常会先调用 calculate_frequency_and_prioritize
+                        // (如果 frequency_needs_update 为 true)
+                        // 这里我们假设调用 send_prioritized_missing_list 时，它内部或其调用者会处理频次计算的逻辑
+                        // 为确保 calculate_frequency_and_prioritize 被调用，我们可以这样做：
+                        pthread_mutex_lock(&satellite->frequency_lock);
+                        if (satellite->frequency_needs_update) {
+                            // 你需要确保 Sate 类有 calculate_frequency_and_prioritize 方法
+                            // 并且该方法会重置 frequency_needs_update 为 false
+                             satellite->calculate_frequency_and_prioritize();
+                        }
+                        // 解锁前可以发送，因为 send_prioritized_missing_list 会再次锁
+                        // 或者 send_prioritized_missing_list 期望在已持有锁的情况下被调用
+                        // 根据 send_prioritized_missing_list 的实现，它自己会加锁frequency_lock
+                        pthread_mutex_unlock(&satellite->frequency_lock); // 先解锁，让 send_prioritized_missing_list 自己管理
+
+                        satellite->send_prioritized_missing_list(satellite->sockfd, &source_addr);
+                    }
+
+                } else {
+                    // 如果收到的分片不是我们当前缺失列表中的，可能已经收到过了
+                    // printf("Received fragment %d, but it was not in the current missing list (or already processed).\n", fragment_id);
+                }
             }
-        break;
+            break;
         //case 1 接收到的是其他卫星的数据流信息
         //默认能发过来控制流信息的卫星都是自己的邻居，已经建立连接的邻居
         case 1:
@@ -385,10 +505,10 @@ void* receive_data(void *arg){
 
                 // 根据稳定性处理缺失信息更新和频次重算触发
                 if (sender_is_currently_stable) {
-                    printf("  稳定邻居 %s:%d 发来缺失列表。更新其缺失数据并标记频次重算。\n", sender_ip, sender_port);
+                    //printf("  稳定邻居 %s:%d 发来缺失列表。更新其缺失数据并标记频次重算。\n", sender_ip, sender_port);
                     satellite->update_neighbor_missing_info(current_neighbor_key, missing_fragments, cnt, true /* 触发频次重算 */);
                 } else {
-                    printf("  非稳定邻居 %s:%d 发来缺失列表。仅记录其缺失数据，不触发频次重算。\n", sender_ip, sender_port);
+                    //printf("  非稳定邻居 %s:%d 发来缺失列表。仅记录其缺失数据，不触发频次重算。\n", sender_ip, sender_port);
                     satellite->update_neighbor_missing_info(current_neighbor_key, missing_fragments, cnt, false /* 不触发频次重算 */);
                 }
             } else {
@@ -396,7 +516,7 @@ void* receive_data(void *arg){
                 // 我们仍然可能需要回复数据，但其缺失信息不会用来更新我们的邻居数据或触发频次计算。
                 // 也可以选择将它的缺失信息存到一个临时的、非邻居的缓存中，如果需要的话。
                 // 但根据当前规则，我们只关心对邻居列表成员的处理。
-                printf("  收到来自非邻居 %s:%d 的 Type 1 消息。其缺失信息不会更新邻居状态或频次计算，但仍会尝试回复数据。\n", sender_ip, sender_port);
+                //printf("  收到来自非邻居 %s:%d 的 Type 1 消息。其缺失信息不会更新邻居状态或频次计算，但仍会尝试回复数据。\n", sender_ip, sender_port);
                 // 注意：这里我们没有更新任何 neighbor_missing_data，因为对方不是邻居。
                 // 如果有全局的 "所有收到过的缺失列表" 缓存，可以更新那里。
             }
@@ -468,7 +588,7 @@ void* receive_data(void *arg){
                 inet_ntop(AF_INET, &(source_addr.sin_addr), sender_ip, INET_ADDRSTRLEN);
                 int sender_port = ntohs(source_addr.sin_port);
 
-                printf("Received broadcast message from %s:%d\n", sender_ip, sender_port);
+                //printf("Received broadcast message from %s:%d\n", sender_ip, sender_port);
 
                 int neighbor_idx = -1; // 用于存储邻居在列表中的索引
 
@@ -489,8 +609,8 @@ void* receive_data(void *arg){
                     satellite->neighbors.push_back(new_neighbor);
                     // neighbor_idx = this->neighbors.size() - 1; // 如果后续需要，可以这样获取新邻居的索引
 
-                    printf("  新邻居 %s:%d 已通过 Type 3 消息加入列表。established_time: %ld, is_stable: false\n",
-                        sender_ip, sender_port, new_neighbor.established_time);
+                    //printf("  新邻居 %s:%d 已通过 Type 3 消息加入列表。established_time: %ld, is_stable: false\n",
+                        //sender_ip, sender_port, new_neighbor.established_time);
 
                     // 注意：此时不改变 frequency_needs_update。
                     // 该邻居是否以及何时变为稳定，由后台线程判断。
@@ -514,6 +634,7 @@ void* receive_data(void *arg){
                     bool needs_prioritized_list_recalculation = false;//这段看要不要
                     pthread_mutex_lock(&satellite->frequency_lock); // 安全读取 frequency_needs_update
                     if (satellite->frequency_needs_update) {
+                        printf("haidfhsafaehfoasefhasfh");
                         needs_prioritized_list_recalculation = true;
                     }
                     pthread_mutex_unlock(&satellite->frequency_lock);//这段看要不要
@@ -524,7 +645,7 @@ void* receive_data(void *arg){
                     }
                     pthread_mutex_unlock(&satellite->frequency_lock);
                     satellite->send_prioritized_missing_list(satellite->sockfd, &source_addr);
-                    printf("已向 %s:%d 发送 Type 1 优先缺失列表 (响应 Type 3)\n", sender_ip, sender_port);
+                    //printf("已向 %s:%d 发送 Type 1 优先缺失列表 (响应 Type 3)\n", sender_ip, sender_port);
                 } else {
                     printf("自身没有缺失数据，不向 %s:%d 发送 Type 1 列表\n", sender_ip, sender_port);
                 }
@@ -607,8 +728,8 @@ void* neighbor_management_routine(void *arg) {
             // 1. 检查是否因超时而移除
             // NEIGHBOR_TIMEOUT_SECONDS 在 satellite.h 中为 5秒
             if (current_time - neighbor.last_seen > NEIGHBOR_TIMEOUT_SECONDS) { //
-                printf("Neighbor %s:%d (Stable: %d) timed out (last_seen: %ld, current: %ld). Removing.\n",
-                       neighbor.ip, neighbor.port, neighbor.is_stable, neighbor.last_seen, current_time);
+                //printf("Neighbor %s:%d (Stable: %d) timed out (last_seen: %ld, current: %ld). Removing.\n",
+                       //neighbor.ip, neighbor.port, neighbor.is_stable, neighbor.last_seen, current_time);
                 
                 bool P_was_stable = neighbor.is_stable;
                 std::string P_neighbor_key_to_remove = make_neighbor_key(neighbor.ip, neighbor.port);
@@ -623,7 +744,7 @@ void* neighbor_management_routine(void *arg) {
                 pthread_mutex_lock(&satellite->missing_data_lock); //
                 satellite->neighbor_missing_data.erase(P_neighbor_key_to_remove); //
                 pthread_mutex_unlock(&satellite->missing_data_lock); //
-                printf("  Removed %s from neighbor_missing_data.\n", P_neighbor_key_to_remove.c_str());
+                //printf("  Removed %s from neighbor_missing_data.\n", P_neighbor_key_to_remove.c_str());
                 continue; 
             }
 
@@ -635,8 +756,8 @@ void* neighbor_management_routine(void *arg) {
                     
                     neighbor.is_stable = true; //
                     P_freq_update_needed = true; // 标记进行频率更新
-                    printf("Neighbor %s:%d is now STABLE. (Established: %ld, LastSeen: %ld, Current: %ld)\n",
-                           neighbor.ip, neighbor.port, neighbor.established_time, neighbor.last_seen, current_time);
+                    //printf("Neighbor %s:%d is now STABLE. (Established: %ld, LastSeen: %ld, Current: %ld)\n",
+                           //neighbor.ip, neighbor.port, neighbor.established_time, neighbor.last_seen, current_time);
                 }
             }
             // 可选：如果 last_seen > RECENCY_THRESHOLD 但尚未超时，则失去稳定性的逻辑
@@ -654,11 +775,11 @@ void* neighbor_management_routine(void *arg) {
         if (P_freq_update_needed) {
             pthread_mutex_lock(&satellite->frequency_lock); //
             satellite->frequency_needs_update = true; //
-            printf("  Neighbor management triggered frequency_needs_update.\n");
+            //printf("  Neighbor management triggered frequency_needs_update.\n");
             pthread_mutex_unlock(&satellite->frequency_lock); //
         }
     }
-    printf("Exiting neighbor_management_routine thread\n");
+    //printf("Exiting neighbor_management_routine thread\n");
     return NULL;
 }
 
@@ -701,18 +822,19 @@ int main(){
     }
     pthread_detach(receive_thread);
 
+    //与基站的连接得改
 
     //进行与基站的第一次互通
     //把发送代码放入线程
     //使用每隔一段时间就发送一次数据的方式发送请求信息
     //初步使用有来自发送处的返回数据包信息就意味着是卫星的一个neighbor
     //后续可以优化为星间路由代码
-    // pthread_t send_thread;
-    // if (pthread_create(&send_thread, NULL, send_data, (void*)satellite) != 0) {
-    //     perror("Failed to create send thread");
-    //     exit(EXIT_FAILURE);
-    // }
-    // pthread_detach(send_thread);
+    pthread_t send_thread;
+    if (pthread_create(&send_thread, NULL, send_data, (void*)satellite) != 0) {
+        perror("Failed to create send thread");
+        exit(EXIT_FAILURE);
+    }
+    pthread_detach(send_thread);
 
 
     //这个地方需要分离出一个线程一直给基站发连接请求

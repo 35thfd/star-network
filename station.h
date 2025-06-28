@@ -26,6 +26,8 @@ typedef struct {
     char* block_data; 
 } Packet;
 
+
+
 // 基站类
 class Station {
 public:
@@ -34,6 +36,7 @@ public:
     int cnt;               
     pthread_t monitor_thread;
     int sockfd;
+    int refresh_interval = 0; 
 
     Station() {
         cnt = CNT;
@@ -134,6 +137,7 @@ typedef struct {
     int socket_fd;
     struct sockaddr_in satellite_addr;
     Station *base_station;
+    int refresh_interval;  // 刷新间隔
 } ProcessData;
 
 #endif // STATION_H
