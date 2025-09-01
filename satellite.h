@@ -7,7 +7,7 @@
 #include <string.h>
 #include <cstring>
 #include <csignal>
-#include <map>  
+#include <map>
 #include <pthread.h>
 #include <netinet/in.h> // For INET_ADDRSTRLEN
 #include <arpa/inet.h>  // For inet_pton, inet_ntop
@@ -70,26 +70,30 @@ typedef struct {
 } NeighborMissingInfoData;
 
 typedef struct {
-    SatelliteType type;  
+    SatelliteType type;
     //int id;
     char neighborip[INET_ADDRSTRLEN];  // 存储邻居 IP
     int neighbor_ports;  // 存储邻居端口
-    int missing_blocks[1024]; 
-    int missing_count; 
-    int frequency[1024]; 
+    int missing_blocks[1024];
+    int missing_count;
+    int frequency[1024];
 } Satellite;
 
 std::string make_neighbor_key(const char* ip, int port);
 
 class Sate {
     public:
-        SatelliteType type;  
-        int id;              
+        SatelliteType type;
+        int id;
         int sockfd;
-        int data[1024][100000]; 
-        int missing_blocks[1024];  
+        int data[1024][100000];
+        int missing_blocks[1024];
         int missing_count;
+        int total_block_count; // 新增：用于存储总块数
         int neighbor_count;
+
+
+        std::map<int, std::string> block_source_map;
 
         //---修改/新增的邻居管理部分---
         std::vector<NeighborInfo> neighbors; // List of established neighbors
@@ -110,9 +114,15 @@ class Sate {
         pthread_t neighbor_management_thread_id; // Dedicated thread for neighbor checks
         pthread_t periodic_task_thread_id; // Existing thread - rename or repurpose if needed
 
-        
+
     //void save_fragment(fragment_id, data);
     void initialize() {
+
+        //读取连接文件
+        //TODO: 读取连接文件
+
+
+        block_source_map.clear();
         memset(missing_blocks, 0, sizeof(missing_blocks));
         for(int i = 0 ; i <= 10; i++)
         {
@@ -120,10 +130,11 @@ class Sate {
         }
         //此处先定义为10,后续改为-1，发送时如果发现是-1代表还没有接收到数据包数量信息，需要等待
         missing_count = 10;
+        total_block_count = 10; // 新增：初始化总块数
         neighbors.clear();
 
         // for (int i = 0; i < 1024; i++) {
-        //     frequency[i] = 1; 
+        //     frequency[i] = 1;
         // }
         neighbors.clear();
         neighbor_missing_data.clear();
@@ -131,8 +142,8 @@ class Sate {
 
         frequency_needs_update = true; // 初始状态需要计算一次频次
         memset(frequency, 0, sizeof(frequency)); // 初始化频次数组
-        
-        //strncpy(neighbors[0].neighborip, "127.0.0.1", INET_ADDRSTRLEN);  
+
+        //strncpy(neighbors[0].neighborip, "127.0.0.1", INET_ADDRSTRLEN);
         //neighbors[0].neighbor_ports = 10010;  // 假设第一个邻居监听 5001 端口
         pthread_mutex_init(&neighbor_lock, NULL);
         pthread_mutex_init(&frequency_lock, NULL);
@@ -152,7 +163,7 @@ class Sate {
     void send_prioritized_missing_list(int sock, const struct sockaddr_in* dest_addr);
     static bool compare_block_frequency(const BlockFrequency& a, const BlockFrequency& b);
 
-    
+
 
     void update_neighbor_missing_info(const std::string& neighbor_key, const int* blocks, int count, bool trigger_freq_recalc) {
         pthread_mutex_lock(&this->missing_data_lock); // ---- BEGIN CRITICAL SECTION for neighbor_missing_data ----
@@ -192,7 +203,7 @@ class Sate {
         // 遍历接收到的缺失数据频次表 s[]
         for (int i = 0; i < s_size; i++) {
             int fragment_id = s[i];
-    
+
             // 如果当前卫星拥有该数据分片，并且它在对方缺失频次最高
             if (data[fragment_id][0] != 0) {
                 best_fragment = fragment_id;
@@ -201,12 +212,12 @@ class Sate {
         if (best_fragment != -1) {
             return best_fragment;
         }
-    
+
         return -1;  // 如果没有合适的分片
     }
 
     int find_neighbor_index(const char* ip, int port);
-    
+
 };
 
-#endif 
+#endif

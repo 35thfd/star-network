@@ -73,6 +73,27 @@ public:
         for (int i = 1; i <= cnt; i++) {
             task_queue.push(i);
         }
+        for (int i = 1; i <= cnt; i++) {
+            task_queue.push(i);
+        }for (int i = 1; i <= cnt; i++) {
+            task_queue.push(i);
+        }for (int i = 1; i <= cnt; i++) {
+            task_queue.push(i);
+        }for (int i = 1; i <= cnt; i++) {
+            task_queue.push(i);
+        }for (int i = 1; i <= cnt; i++) {
+            task_queue.push(i);
+        }for (int i = 1; i <= cnt; i++) {
+            task_queue.push(i);
+        }for (int i = 1; i <= cnt; i++) {
+            task_queue.push(i);
+        }for (int i = 1; i <= cnt; i++) {
+            task_queue.push(i);
+        }for (int i = 1; i <= cnt; i++) {
+            task_queue.push(i);
+        }for (int i = 1; i <= cnt; i++) {
+            task_queue.push(i);
+        }
         printf("Queue initialized with %d blocks.\n", cnt);
     }
 

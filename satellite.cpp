@@ -22,7 +22,7 @@
 using namespace std;
 
 #define MAX_FRAGMENTS 100
-#define SLEEP_TIME 10
+#define SLEEP_TIME 1
 #define FRAGMENT_SIZE 512
 #define BUFFER_SIZE (sizeof(int) + FRAGMENT_SIZE)
 #define BASE_STATION_IP "192.168.1.2" 
@@ -89,7 +89,7 @@ bool Sate::compare_block_frequency(const BlockFrequency& a, const BlockFrequency
 void Sate::calculate_frequency_and_prioritize() {
     // 假设调用者已经获取了 this->frequency_lock
 
-    printf("PID %lu: 开始计算频次和优先级...\n", (unsigned long)pthread_self());
+    //printf("PID %lu: 开始计算频次和优先级...\n", (unsigned long)pthread_self());
 
     // --- 1. 初始化本卫星的全局频次统计数组 ---
     // 假设块ID的范围是0到1023。如果不是，请调整数组大小和索引逻辑。
@@ -139,7 +139,7 @@ void Sate::calculate_frequency_and_prioritize() {
 
     pthread_mutex_unlock(&this->missing_data_lock);
     pthread_mutex_unlock(&this->neighbor_lock);
-    printf("  共计 %d 个稳定邻居的缺失信息已计入频次统计。\n", stable_neighbors_counted);
+    //printf("  共计 %d 个稳定邻居的缺失信息已计入频次统计。\n", stable_neighbors_counted);
 
 
     // --- 4. 根据计算出的全局频次，对本卫星“自身缺失的块”进行排序 ---
@@ -186,16 +186,16 @@ void Sate::calculate_frequency_and_prioritize() {
     // 用过滤后的列表替换旧的 prioritized_missing_list
     this->prioritized_missing_list = filtered_list;
     // 打印调试信息 (可选)
-    printf("  频次计算和优先级排序完成。本卫星的优先缺失列表 (%zu 个条目): ", this->prioritized_missing_list.size());
+    //printf("  频次计算和优先级排序完成。本卫星的优先缺失列表 (%zu 个条目): ", this->prioritized_missing_list.size());
     for(int id : this->prioritized_missing_list) {
-        printf("%d(全局freq:%d) ", id, (id >=0 && id < 1024 ? this->frequency[id] : -1));
+        //printf("%d(全局freq:%d) ", id, (id >=0 && id < 1024 ? this->frequency[id] : -1));
     }
-    printf("\n");
+    //printf("\n");
 
     // --- 6. 更新标志位 ---
     // 这一步应该在调用此函数的临界区内完成，或者此函数是唯一修改它的地方（在持有frequency_lock时）
     this->frequency_needs_update = false;
-    printf("PID %lu: 频次计算完成，frequency_needs_update 设置为 false。\n", (unsigned long)pthread_self());
+    //printf("PID %lu: 频次计算完成，frequency_needs_update 设置为 false。\n", (unsigned long)pthread_self());
 }
 
 
@@ -217,7 +217,6 @@ void Sate::send_prioritized_missing_list(int sock, const struct sockaddr_in* des
     // 1. 准备消息内容
     int message_type = 1; // Type 1 消息
     int count = static_cast<int>(this->prioritized_missing_list.size());
-    printf("counnnnnt %d\n", count);
 
     // 计算缓冲区大小: 消息类型(int) + 数量(int) + 块ID列表(count * int)
     size_t buffer_size = sizeof(int) + sizeof(int) + (count * sizeof(int));
@@ -243,11 +242,11 @@ void Sate::send_prioritized_missing_list(int sock, const struct sockaddr_in* des
     // 3. 发送消息
     ssize_t bytes_sent = sendto(sock, buffer, buffer_size, 0,(const struct sockaddr*)dest_addr, sizeof(struct sockaddr_in));
 
-    cout << "Control weixing sent: ";
+    //cout << "Control weixing sent: ";
     for (int i = 0; i < sizeof(int) * 2 + missing_count * sizeof(int); i++) {
-        printf("%02x ", (unsigned char)buffer[i]);
+        //printf("%02x ", (unsigned char)buffer[i]);
     }
-    printf("\n");
+    //printf("\n");
 
     if (bytes_sent < 0) {
         perror("send_prioritized_missing_list: sendto 失败");
@@ -255,8 +254,8 @@ void Sate::send_prioritized_missing_list(int sock, const struct sockaddr_in* des
         fprintf(stderr, "send_prioritized_missing_list: 警告 - 发送的字节数 (%zd) 与预期 (%zu) 不符给 %s:%d\n",
                 bytes_sent, buffer_size, inet_ntoa(dest_addr->sin_addr), ntohs(dest_addr->sin_port));
     } else {
-        printf("已成功发送 Type 1 优先缺失列表 (%d 个条目) 给 %s:%d\n",
-               count, inet_ntoa(dest_addr->sin_addr), ntohs(dest_addr->sin_port));
+        //printf("已成功发送 Type 1 优先缺失列表 (%d 个条目) 给 %s:%d\n",
+               //count, inet_ntoa(dest_addr->sin_addr), ntohs(dest_addr->sin_port));
     }
 
     delete[] buffer; // 释放动态分配的内存
@@ -270,15 +269,15 @@ void send_control_info(int sockfd, struct sockaddr_in *des_addr, int *missing_bl
     memcpy(buffer, &temp_i, sizeof(int));  
     memcpy(buffer + sizeof(int), &missing_count, sizeof(int)); 
     memcpy(buffer + sizeof(int) * 2, (missing_blocks+1), missing_count * sizeof(int));
-    cout << "Control station: ";
+    //cout << "Control station: ";
     for (int i = 0; i < sizeof(int) * 2 + missing_count * sizeof(int); i++) {
-        printf("%02x ", (unsigned char)buffer[i]);
+        //printf("%02x ", (unsigned char)buffer[i]);
     }
-    printf("\n");
+    //printf("\n");
     sendto(sockfd, buffer, sizeof(int) * 2 + missing_count * sizeof(int), MSG_CONFIRM, 
            (const struct sockaddr *)des_addr, sizeof(*des_addr));
 
-    printf("Sent control info: %d fragments\n", missing_count);
+    //printf("Sent control info: %d fragments\n", missing_count);
 }
 
 void send_to_base_station(int sockfd, int* missing_blocks, int missing_count){
@@ -291,7 +290,7 @@ void send_to_base_station(int sockfd, int* missing_blocks, int missing_count){
         perror("Invalid base station address");
         exit(EXIT_FAILURE);
     }
-    printf("Sending control info to base station at %s:%d\n", BASE_STATION_IP, BASE_STATION_PORT);
+    //printf("Sending control info to base station at %s:%d\n", BASE_STATION_IP, BASE_STATION_PORT);
     send_control_info(sockfd, &base_station_addr, missing_blocks, missing_count);
 }
 
@@ -339,7 +338,7 @@ void* receive_data(void *arg){
 
         int kind;
         memcpy(&kind, control_buffer, sizeof(int)); 
-        printf("data kind : %d\n ", kind);
+        //printf("data kind : %d\n ", kind);
 
 
         //int fragment_id;
@@ -415,6 +414,12 @@ void* receive_data(void *arg){
                         processed_this_fragment = true; // 标记已处理
                         // printf("Processed fragment %d. New missing_count: %d\n", fragment_id, satellite->missing_count);
 
+                        char source_ip[INET_ADDRSTRLEN];
+                        inet_ntop(AF_INET, &(source_addr.sin_addr), source_ip, INET_ADDRSTRLEN);
+                        std::string source_address = std::string(source_ip) + ":" + std::to_string(ntohs(source_addr.sin_port));
+                        satellite->block_source_map[fragment_id] = source_address; // 记录来源// 将分片ID和其来源地址存入map中
+
+
                         // 复制数据到卫星的存储区
                         memcpy(satellite->data[fragment_id], data_payload, DATA_SIZE); // 确保 DATA_SIZE 是正确的
 
@@ -429,9 +434,48 @@ void* receive_data(void *arg){
 
 
                 if (processed_this_fragment) {
+                    // ==================== 可视化进度条 START ====================
+                    int total_blocks = satellite->total_block_count;
+                    if (total_blocks > 0) {
+                        int received_count = total_blocks - current_missing_count_after_processing;
+                        float percentage = (float)received_count / total_blocks * 100.0;
+                        int bar_width = 40; // 进度条宽度
+                        int pos = bar_width * percentage / 100;
+
+                        // 使用 \r 回到行首来刷新单行，\n 用于换行，避免日志混乱
+                        printf("\n[PROGRESS] [");
+                        for (int i = 0; i < bar_width; ++i) {
+                            if (i < pos) printf("=");
+                            else if (i == pos) printf(">");
+                            else printf(" ");
+                        }
+                        printf("] %d/%d (%.2f%%) received.\n", received_count, total_blocks, percentage);
+                        fflush(stdout);
+                    }
+                    // ===================== 可视化进度条 END =====================
                     // 如果所有数据都已接收完毕
                     if (current_missing_count_after_processing == 0) {
-                        printf("All data received: stop\n");
+                        printf("\nAll data fragments received! Transmission complete.\n");
+
+                        printf("\n--- 数据来源统计 ---\n");
+                        printf("+--------------+-------------------------+\n");
+                        printf("|  数据分片ID  |       来源地址          |\n");
+                        printf("+--------------+-------------------------+\n");
+                    
+                        // 遍历所有分片ID，以确保输出顺序正确
+                        for (int i = 1; i <= satellite->total_block_count; ++i) {
+                            auto it = satellite->block_source_map.find(i);
+                            if (it != satellite->block_source_map.end()) {
+                                // it->first 是分片ID, it->second 是来源地址字符串
+                                printf("| %-12d | %-23s |\n", it->first, it->second.c_str());
+                            } else {
+                                // 这个分支处理卫星初始就可能拥有的数据（如果有的话）
+                                printf("| %-12d | %-23s |\n", i, "初始持有/未知");
+                            }
+                        }
+                        
+                        printf("+--------------+-------------------------+\n\n");
+                        
                         return NULL; // 结束 receive_data 线程
                     }
 
@@ -481,7 +525,7 @@ void* receive_data(void *arg){
             //在这个地方只储存稳定邻居的内容
             int cnt;
             memcpy(&cnt, buffer, sizeof(int));  // 解析分片数量
-            printf("Received control message from neighbor satellite, cnt: %d\n", cnt);
+            //printf("Received control message from neighbor satellite, cnt: %d\n", cnt);
 
             int *missing_fragments = (int *)malloc(cnt * sizeof(int));
             memcpy(missing_fragments, buffer + sizeof(int), cnt * sizeof(int));
@@ -634,7 +678,6 @@ void* receive_data(void *arg){
                     bool needs_prioritized_list_recalculation = false;//这段看要不要
                     pthread_mutex_lock(&satellite->frequency_lock); // 安全读取 frequency_needs_update
                     if (satellite->frequency_needs_update) {
-                        printf("haidfhsafaehfoasefhasfh");
                         needs_prioritized_list_recalculation = true;
                     }
                     pthread_mutex_unlock(&satellite->frequency_lock);//这段看要不要
@@ -667,13 +710,13 @@ void* send_data(void *arg){
             //向其他已经连接的卫星发送请求
             //send_to_neighbor_satellite(satellite->sockfd, satellite->missing_blocks, satellite->missing_count, satellite->neighbor_count, satellite->neighbors);
         }
-        sleep(SLEEP_TIME);
+        sleep(10);
     }
     return NULL;
 }
 
 void* send_heartbeat(void *arg){
-    printf("send_heartbeat\n");
+    //printf("send_heartbeat\n");
     Sate *satellite = (Sate *) arg;
     struct sockaddr_in broadcast_addr;
     int broadcast_enable = 1;
@@ -701,7 +744,7 @@ void* send_heartbeat(void *arg){
         if (bytes_sent < 0) {
             perror("Heartbeat send failed");
         } else {
-            printf("Heartbeat broadcast sent.\n");
+            //printf("Heartbeat broadcast sent.\n");
         }
 
         sleep(SLEEP_TIME);
@@ -711,7 +754,7 @@ void* send_heartbeat(void *arg){
 
 void* neighbor_management_routine(void *arg) {
     Sate *satellite = (Sate *)arg;
-    const int RECENCY_THRESHOLD_SECONDS_FOR_STABILITY = 10; // 用户定义：最近10秒内连接以保持稳定
+    const int RECENCY_THRESHOLD_SECONDS_FOR_STABILITY = 4; // 用户定义：最近10秒内连接以保持稳定
     const int CHECK_INTERVAL_SECONDS = 2;                  // 此线程运行检查的频率（更频繁）
 
     printf("Starting neighbor_management_routine thread\n");
