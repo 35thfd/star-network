@@ -57,17 +57,11 @@ int main() {
             perror("Memory allocation failed");
             continue;  // 如果内存分配失败，跳过此次处理
         }
-
-        base_station.refresh_interval ++;
+        
         memcpy(data->control_message, buffer, n);  
         data->socket_fd = socket_fd;
         data->satellite_addr = satellite_addr;
         data->base_station = &base_station;
-        data->refresh_interval = base_station.refresh_interval;  // 设置刷新间隔为1秒
-
-        if(base_station.refresh_interval > 10) {
-            base_station.refresh_interval = 0;  // 重置刷新间隔
-        }
 
         if (pthread_create(&process_thread, NULL, Station::process_message, (void*)data) != 0) {
             perror("Failed to create process thread");

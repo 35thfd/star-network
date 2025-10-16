@@ -23,13 +23,9 @@ void* Station::process_message(void *arg) {
     ProcessData *data = (ProcessData*)arg;
     char *control_message = data->control_message;
     int socket_fd = data->socket_fd;
-    int refresh_interval = data->refresh_interval;  // 获取刷新间隔
+
     struct sockaddr_in satellite_addr = data->satellite_addr;
     Station *base_station = data->base_station;
-
-    if (refresh_interval == 10) {
-        base_station->init_queue();
-    }
 
     int cnt,kind;
     memcpy(&kind, control_message, sizeof(int));

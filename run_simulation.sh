@@ -6,7 +6,7 @@ docker build -t sta-main-image -f Dockerfile.sta_main .
 NUM_SATS=3
 NETWORK_NAME=my_network
 # IMAGE_NAME=satellite-image
-BLOCK_INTERVAL=3  # 每隔多少秒模拟拓扑变化
+BLOCK_INTERVAL= 2 # 每隔多少秒模拟拓扑变化
 
 docker rm -f station >/dev/null 2>&1
 for i in $(seq 1 $NUM_SATS); do

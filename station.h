@@ -70,29 +70,10 @@ public:
 
     // 初始化队列
     void init_queue() {
-        for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
-        }
-        for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
-        }for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
-        }for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
-        }for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
-        }for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
-        }for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
-        }for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
-        }for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
-        }for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
-        }for (int i = 1; i <= cnt; i++) {
-            task_queue.push(i);
+        for(int j = 0; j < 500; j++) {
+            for (int i = 1; i <= cnt; i++) {
+                task_queue.push(i);
+            }
         }
         printf("Queue initialized with %d blocks.\n", cnt);
     }
